@@ -1,0 +1,23 @@
+﻿# exported by some panel
+port: 7890
+socks-port: 7891
+mode: Rule
+proxies:
+  - {name: "M1 port as string", type: ss, server: 203.0.113.70, port: "8388", cipher: aes-256-gcm, password: fakepass}
+  - {name: "M2 upper-case type", type: VMESS, server: 203.0.113.71, port: 443, uuid: 11111111-2222-3333-4444-555555555531, alterId: 0, cipher: auto}
+  - {name: "M3 unknown field", type: trojan, server: 203.0.113.72, port: 443, password: fakepass, sni: tj.example.com, some-new-field: 1}
+  - {name: "M4 missing port", type: ss, server: 203.0.113.73, cipher: aes-256-gcm, password: fakepass}
+  - {name: "M5 unknown type", type: mieru, server: 203.0.113.74, port: 2999, username: u, password: p}
+  - {name: "M6 duplicate", type: ss, server: 203.0.113.75, port: 8388, cipher: aes-256-gcm, password: fakepass}
+  - {name: "M6 duplicate", type: ss, server: 203.0.113.76, port: 8388, cipher: aes-256-gcm, password: fakepass}
+  - {name: "M7 password number", type: trojan, server: 203.0.113.77, port: 443, password: 123456, sni: tj.example.com}
+  - {name: "M8 ws-path legacy", type: vmess, server: 203.0.113.78, port: 80, uuid: 11111111-2222-3333-4444-555555555532, alterId: 0, cipher: auto, network: ws, ws-path: /legacy, ws-headers: {Host: legacy.example.com}}
+  - {name: "M9 bad uuid", type: vless, server: 203.0.113.79, port: 443, uuid: not-a-uuid, tls: true}
+  - {name: "M10 tab	in name", type: ss, server: 203.0.113.80, port: 8388, cipher: aes-256-gcm, password: fakepass}
+proxy-groups:
+  - {name: PROXY, type: select, proxies: ["M1 port as string", "M2 upper-case type", "M4 missing port", "M5 unknown type", "M6 duplicate", DIRECT]}
+  - {name: Empty, type: select, proxies: []}
+rules:
+  - DOMAIN-SUFFIX,example.com,PROXY
+  - DOMAIN-SUFFIX,missing.example,NoSuchGroup
+  - MATCH,PROXY

@@ -1,0 +1,378 @@
+{
+ "mixed-port": 7890,
+ "allow-lan": false,
+ "mode": "rule",
+ "log-level": "info",
+ "ipv6": true,
+ "dns": {
+  "enable": true,
+  "ipv6": true,
+  "enhanced-mode": "fake-ip",
+  "fake-ip-range": "198.18.0.1/16",
+  "fake-ip-filter": [
+   "*.lan",
+   "+.local",
+   "time.*.com"
+  ],
+  "default-nameserver": [
+   "223.5.5.5"
+  ],
+  "nameserver": [
+   "https://dns.alidns.com/dns-query",
+   "tls://dot.pub"
+  ],
+  "proxy-server-nameserver": [
+   "https://doh.pub/dns-query"
+  ],
+  "nameserver-policy": {
+   "geosite:cn": [
+    "https://dns.alidns.com/dns-query"
+   ],
+   "+.internal.example": "10.0.0.53"
+  },
+  "fallback": [
+   "https://1.1.1.1/dns-query"
+  ]
+ },
+ "tun": {
+  "enable": true,
+  "stack": "mixed",
+  "auto-route": true,
+  "auto-detect-interface": true,
+  "dns-hijack": [
+   "any:53"
+  ]
+ },
+ "proxies": [
+  {
+   "name": "SS-2022 HK",
+   "type": "ss",
+   "server": "ss.example.com",
+   "port": 8388,
+   "cipher": "2022-blake3-aes-128-gcm",
+   "password": "AAAAAAAAAAAAAAAAAAAAAA==",
+   "udp": true
+  },
+  {
+   "name": "SS obfs JP",
+   "type": "ss",
+   "server": "203.0.113.10",
+   "port": 8389,
+   "cipher": "aes-256-gcm",
+   "password": "fakepass",
+   "plugin": "obfs",
+   "plugin-opts": {
+    "mode": "http",
+    "host": "bing.com"
+   }
+  },
+  {
+   "name": "SS v2ray-plugin",
+   "type": "ss",
+   "server": "203.0.113.11",
+   "port": 443,
+   "cipher": "chacha20-ietf-poly1305",
+   "password": "fakepass",
+   "plugin": "v2ray-plugin",
+   "plugin-opts": {
+    "mode": "websocket",
+    "tls": true,
+    "host": "v2.example.com",
+    "path": "/ws"
+   }
+  },
+  {
+   "name": "VMess WS TLS",
+   "type": "vmess",
+   "server": "vm.example.com",
+   "port": 443,
+   "uuid": "11111111-2222-3333-4444-555555555555",
+   "alterId": 0,
+   "cipher": "auto",
+   "tls": true,
+   "servername": "vm.example.com",
+   "skip-cert-verify": false,
+   "network": "ws",
+   "ws-opts": {
+    "path": "/vmws?ed=2048",
+    "headers": {
+     "Host": "vm.example.com"
+    }
+   }
+  },
+  {
+   "name": "VMess gRPC",
+   "type": "vmess",
+   "server": "vm2.example.com",
+   "port": 443,
+   "uuid": "11111111-2222-3333-4444-555555555556",
+   "alterId": 0,
+   "cipher": "auto",
+   "tls": true,
+   "servername": "vm2.example.com",
+   "network": "grpc",
+   "grpc-opts": {
+    "grpc-service-name": "gunservice"
+   }
+  },
+  {
+   "name": "VMess H2",
+   "type": "vmess",
+   "server": "vm3.example.com",
+   "port": 443,
+   "uuid": "11111111-2222-3333-4444-555555555557",
+   "alterId": 0,
+   "cipher": "auto",
+   "tls": true,
+   "network": "h2",
+   "h2-opts": {
+    "host": [
+     "vm3.example.com"
+    ],
+    "path": "/h2"
+   }
+  },
+  {
+   "name": "VMess HTTP obfs",
+   "type": "vmess",
+   "server": "203.0.113.12",
+   "port": 80,
+   "uuid": "11111111-2222-3333-4444-555555555558",
+   "alterId": 0,
+   "cipher": "auto",
+   "network": "http",
+   "http-opts": {
+    "method": "GET",
+    "path": [
+     "/"
+    ],
+    "headers": {
+     "Host": [
+      "www.bing.com"
+     ]
+    }
+   }
+  },
+  {
+   "name": "VLESS Reality Vision",
+   "type": "vless",
+   "server": "203.0.113.20",
+   "port": 443,
+   "uuid": "22222222-3333-4444-5555-666666666666",
+   "network": "tcp",
+   "tls": true,
+   "udp": true,
+   "flow": "xtls-rprx-vision",
+   "servername": "www.microsoft.com",
+   "client-fingerprint": "chrome",
+   "reality-opts": {
+    "public-key": "cU8Zyhhd2KPM53Bth1s59kIkPBRb-D63eYMPCb_LDTQ",
+    "short-id": "0123abcd"
+   }
+  },
+  {
+   "name": "VLESS WS",
+   "type": "vless",
+   "server": "vl.example.com",
+   "port": 443,
+   "uuid": "22222222-3333-4444-5555-666666666667",
+   "network": "ws",
+   "tls": true,
+   "servername": "vl.example.com",
+   "ws-opts": {
+    "path": "/vlws",
+    "headers": {
+     "Host": "vl.example.com"
+    }
+   }
+  },
+  {
+   "name": "Trojan gRPC",
+   "type": "trojan",
+   "server": "tj.example.com",
+   "port": 443,
+   "password": "fakepass",
+   "sni": "tj.example.com",
+   "network": "grpc",
+   "grpc-opts": {
+    "grpc-service-name": "tjgrpc"
+   }
+  },
+  {
+   "name": "Hysteria2 hop",
+   "type": "hysteria2",
+   "server": "hy2.example.com",
+   "port": 443,
+   "ports": "20000-30000",
+   "password": "fakepass",
+   "sni": "hy2.example.com",
+   "obfs": "salamander",
+   "obfs-password": "obfsfake",
+   "up": "50 Mbps",
+   "down": "200 Mbps"
+  },
+  {
+   "name": "TUIC v5",
+   "type": "tuic",
+   "server": "tuic.example.com",
+   "port": 443,
+   "uuid": "33333333-4444-5555-6666-777777777777",
+   "password": "fakepass",
+   "alpn": [
+    "h3"
+   ],
+   "congestion-controller": "bbr",
+   "udp-relay-mode": "native",
+   "sni": "tuic.example.com"
+  },
+  {
+   "name": "AnyTLS",
+   "type": "anytls",
+   "server": "any.example.com",
+   "port": 443,
+   "password": "fakepass",
+   "sni": "any.example.com",
+   "client-fingerprint": "chrome",
+   "udp": true
+  },
+  {
+   "name": "WireGuard",
+   "type": "wireguard",
+   "server": "203.0.113.30",
+   "port": 51820,
+   "ip": "172.16.0.2",
+   "ipv6": "fd01::2",
+   "private-key": "eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=",
+   "public-key": "Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=",
+   "allowed-ips": [
+    "0.0.0.0/0",
+    "::/0"
+   ],
+   "mtu": 1280,
+   "udp": true
+  },
+  {
+   "name": "SSH",
+   "type": "ssh",
+   "server": "203.0.113.40",
+   "port": 22,
+   "username": "user",
+   "password": "fakepass"
+  },
+  {
+   "name": "SOCKS5",
+   "type": "socks5",
+   "server": "203.0.113.50",
+   "port": 1080,
+   "username": "u",
+   "password": "p"
+  },
+  {
+   "name": "HTTP TLS",
+   "type": "http",
+   "server": "203.0.113.51",
+   "port": 443,
+   "username": "u",
+   "password": "p",
+   "tls": true
+  }
+ ],
+ "proxy-groups": [
+  {
+   "name": "节点选择",
+   "type": "select",
+   "proxies": [
+    "自动选择",
+    "故障转移",
+    "负载均衡",
+    "香港",
+    "DIRECT"
+   ]
+  },
+  {
+   "name": "自动选择",
+   "type": "url-test",
+   "proxies": [
+    "SS-2022 HK",
+    "VMess WS TLS",
+    "VLESS Reality Vision",
+    "Hysteria2 hop"
+   ],
+   "url": "https://www.gstatic.com/generate_204",
+   "interval": 300,
+   "tolerance": 50
+  },
+  {
+   "name": "故障转移",
+   "type": "fallback",
+   "proxies": [
+    "VLESS Reality Vision",
+    "TUIC v5",
+    "AnyTLS"
+   ],
+   "url": "https://www.gstatic.com/generate_204",
+   "interval": 300
+  },
+  {
+   "name": "负载均衡",
+   "type": "load-balance",
+   "strategy": "consistent-hashing",
+   "proxies": [
+    "Trojan gRPC",
+    "VMess gRPC"
+   ],
+   "url": "https://www.gstatic.com/generate_204",
+   "interval": 300
+  },
+  {
+   "name": "香港",
+   "type": "select",
+   "filter": "(?i)HK|香港",
+   "include-all": true
+  },
+  {
+   "name": "漏网之鱼",
+   "type": "select",
+   "proxies": [
+    "节点选择",
+    "DIRECT"
+   ]
+  }
+ ],
+ "rule-providers": {
+  "ads": {
+   "type": "http",
+   "behavior": "domain",
+   "format": "mrs",
+   "url": "https://example.com/rules/ads.mrs",
+   "path": "./ruleset/ads.mrs",
+   "interval": 86400
+  },
+  "telegram-ip": {
+   "type": "http",
+   "behavior": "ipcidr",
+   "format": "yaml",
+   "url": "https://example.com/rules/telegram.yaml",
+   "path": "./ruleset/telegram.yaml",
+   "interval": 86400
+  }
+ },
+ "rules": [
+  "RULE-SET,ads,REJECT",
+  "DOMAIN,api.example.com,DIRECT",
+  "DOMAIN-SUFFIX,google.com,节点选择",
+  "DOMAIN-KEYWORD,YouTube,节点选择",
+  "DOMAIN-REGEX,^ads\\d+\\.example\\.net$,REJECT",
+  "GEOSITE,openai,自动选择",
+  "PROCESS-NAME,Telegram.exe,节点选择",
+  "DST-PORT,22,DIRECT",
+  "AND,((DOMAIN-SUFFIX,example.org),(NETWORK,UDP)),REJECT",
+  "RULE-SET,telegram-ip,节点选择,no-resolve",
+  "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
+  "IP-CIDR6,fd00::/8,DIRECT,no-resolve",
+  "GEOIP,LAN,DIRECT,no-resolve",
+  "GEOSITE,cn,DIRECT",
+  "GEOIP,CN,DIRECT",
+  "MATCH,漏网之鱼"
+ ]
+}

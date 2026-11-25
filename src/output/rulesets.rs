@@ -7,12 +7,18 @@
 
 /// sing-box rule-set URL for `GEOSITE,<name>`.
 pub fn geosite_srs(name: &str) -> String {
-    format!("https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{}.srs", name.to_ascii_lowercase())
+    format!(
+        "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{}.srs",
+        name.to_ascii_lowercase()
+    )
 }
 
 /// sing-box rule-set URL for `GEOIP,<code>`.
 pub fn geoip_srs(code: &str) -> String {
-    format!("https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{}.srs", code.to_ascii_lowercase())
+    format!(
+        "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{}.srs",
+        code.to_ascii_lowercase()
+    )
 }
 
 /// Maps a mihomo rule-provider URL from meta-rules-dat to the sing-box build.
@@ -58,12 +64,16 @@ pub fn srs_to_mrs(url: &str) -> Option<String> {
         if stem.contains("sing-geosite")
             && let Some(n) = name.strip_prefix("geosite-")
         {
-            return Some(format!("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/{n}.mrs"));
+            return Some(format!(
+                "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/{n}.mrs"
+            ));
         }
         if stem.contains("sing-geoip")
             && let Some(n) = name.strip_prefix("geoip-")
         {
-            return Some(format!("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/{n}.mrs"));
+            return Some(format!(
+                "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/{n}.mrs"
+            ));
         }
     }
     None
@@ -80,13 +90,18 @@ mod tests {
             Some("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/openai.srs")
         );
         assert_eq!(
-            mihomo_to_srs("https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs").as_deref(),
+            mihomo_to_srs(
+                "https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs"
+            )
+            .as_deref(),
             Some("https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs")
         );
         assert_eq!(mihomo_to_srs("https://example.com/my.yaml"), None);
         assert_eq!(
             srs_to_mrs(&geosite_srs("cn")).as_deref(),
-            Some("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs")
+            Some(
+                "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs"
+            )
         );
     }
 }

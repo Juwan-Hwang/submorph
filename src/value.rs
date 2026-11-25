@@ -115,9 +115,14 @@ impl Value {
         match self {
             Value::Null => Json::Null,
             Value::Scalar { text, quoted: true } => Json::String(text.clone()),
-            Value::Scalar { text, quoted: false } => resolve_plain(text),
+            Value::Scalar {
+                text,
+                quoted: false,
+            } => resolve_plain(text),
             Value::Seq(s) => Json::Array(s.iter().map(Value::to_json).collect()),
-            Value::Map(m) => Json::Object(m.iter().map(|(k, v)| (k.clone(), v.to_json())).collect()),
+            Value::Map(m) => {
+                Json::Object(m.iter().map(|(k, v)| (k.clone(), v.to_json())).collect())
+            }
         }
     }
 
@@ -129,7 +134,11 @@ impl Value {
             Json::Number(n) => Value::plain(n.to_string()),
             Json::String(s) => Value::str(s.clone()),
             Json::Array(a) => Value::Seq(a.iter().map(Value::from_json).collect()),
-            Json::Object(o) => Value::Map(o.iter().map(|(k, v)| (k.clone(), Value::from_json(v))).collect()),
+            Json::Object(o) => Value::Map(
+                o.iter()
+                    .map(|(k, v)| (k.clone(), Value::from_json(v)))
+                    .collect(),
+            ),
         }
     }
 }
@@ -226,7 +235,10 @@ mod tests {
         assert_eq!(Value::str("yes").as_bool(), Some(true));
         assert_eq!(Value::plain("1e5").as_string().as_deref(), Some("1e5"));
         assert_eq!(Value::plain("1e5").to_json(), serde_json::json!(100000.0));
-        assert_eq!(Value::plain("0123abcd").to_json(), serde_json::json!("0123abcd"));
+        assert_eq!(
+            Value::plain("0123abcd").to_json(),
+            serde_json::json!("0123abcd")
+        );
         assert_eq!(Value::str("a, b").as_str_list(), vec!["a", "b"]);
     }
 }

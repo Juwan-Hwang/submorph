@@ -67,7 +67,9 @@ pub enum ConvertError {
 impl std::fmt::Display for ConvertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConvertError::UnknownTarget(t) => write!(f, "unknown target `{t}` (expected mihomo or sing-box)"),
+            ConvertError::UnknownTarget(t) => {
+                write!(f, "unknown target `{t}` (expected mihomo or sing-box)")
+            }
             ConvertError::Parse(e) => e.fmt(f),
         }
     }
@@ -76,12 +78,20 @@ impl std::fmt::Display for ConvertError {
 impl std::error::Error for ConvertError {}
 
 /// Parses `input` (any supported format) and renders it for `target`.
-pub fn convert(input: &str, target: &str, opts: &ConvertOptions) -> Result<Converted, ConvertError> {
+pub fn convert(
+    input: &str,
+    target: &str,
+    opts: &ConvertOptions,
+) -> Result<Converted, ConvertError> {
     convert_bytes(input.as_bytes(), target, opts)
 }
 
 /// Like [`convert`], for raw bytes (UTF-16 and invalid UTF-8 are handled).
-pub fn convert_bytes(input: &[u8], target: &str, opts: &ConvertOptions) -> Result<Converted, ConvertError> {
+pub fn convert_bytes(
+    input: &[u8],
+    target: &str,
+    opts: &ConvertOptions,
+) -> Result<Converted, ConvertError> {
     let t = target_by_id(target).ok_or_else(|| ConvertError::UnknownTarget(target.to_string()))?;
     let (mut cfg, mut d) = parse_bytes(input, &opts.parse).map_err(ConvertError::Parse)?;
     apply_provider_contents(&mut cfg, opts, &mut d);
@@ -97,7 +107,12 @@ pub fn convert_bytes(input: &[u8], target: &str, opts: &ConvertOptions) -> Resul
 pub fn apply_provider_contents(cfg: &mut Config, opts: &ConvertOptions, d: &mut Diagnostics) {
     for (name, text) in &opts.provider_contents {
         let Some(p) = cfg.rule_providers.iter_mut().find(|p| &p.name == name) else {
-            d.warn(Kind::Invalid, format!("rule-provider {name:?}"), None, "content was supplied but the config has no provider by that name");
+            d.warn(
+                Kind::Invalid,
+                format!("rule-provider {name:?}"),
+                None,
+                "content was supplied but the config has no provider by that name",
+            );
             continue;
         };
         p.payload = provider_lines(text);
@@ -116,6 +131,11 @@ pub fn provider_lines(text: &str) -> Vec<String> {
     text.lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("//"))
-        .map(|l| l.trim_start_matches("- ").trim_matches('\'').trim_matches('"').to_string())
+        .map(|l| {
+            l.trim_start_matches("- ")
+                .trim_matches('\'')
+                .trim_matches('"')
+                .to_string()
+        })
         .collect()
 }

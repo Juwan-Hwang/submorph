@@ -1,0 +1,334 @@
+[
+ {
+  "name": "SS AEAD",
+  "type": "ss",
+  "server": "203.0.113.1",
+  "port": 8388,
+  "cipher": "aes-256-gcm",
+  "password": "fakepass"
+ },
+ {
+  "name": "SS 2022",
+  "type": "ss",
+  "server": "ss.example.com",
+  "port": 8389,
+  "cipher": "2022-blake3-aes-128-gcm",
+  "password": "AAAAAAAAAAAAAAAAAAAAAA=="
+ },
+ {
+  "name": "SS obfs",
+  "type": "ss",
+  "server": "203.0.113.2",
+  "port": 8390,
+  "cipher": "chacha20-ietf-poly1305",
+  "password": "fakepass",
+  "plugin": "obfs",
+  "plugin-opts": {
+   "mode": "http",
+   "host": "bing.com"
+  }
+ },
+ {
+  "name": "SS v2ray-plugin",
+  "type": "ss",
+  "server": "203.0.113.3",
+  "port": 443,
+  "cipher": "aes-128-gcm",
+  "password": "fakepass",
+  "plugin": "v2ray-plugin",
+  "plugin-opts": {
+   "mode": "websocket",
+   "tls": true,
+   "host": "v2.example.com",
+   "path": "/ws"
+  }
+ },
+ {
+  "name": "SS legacy",
+  "type": "ss",
+  "server": "203.0.113.4",
+  "port": 8391,
+  "cipher": "aes-256-cfb",
+  "password": "fakepass"
+ },
+ {
+  "name": "SSR 节点",
+  "type": "ssr",
+  "server": "203.0.113.5",
+  "port": 8392,
+  "cipher": "aes-256-cfb",
+  "password": "fakepass",
+  "protocol": "auth_aes128_md5",
+  "protocol-param": "32:proto",
+  "obfs": "tls1.2_ticket_auth",
+  "obfs-param": "obfs.example.com"
+ },
+ {
+  "name": "VMess WS",
+  "type": "vmess",
+  "server": "vm.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555501",
+  "alterId": 0,
+  "cipher": "auto",
+  "tls": true,
+  "servername": "vm.example.com",
+  "alpn": [
+   "h2",
+   "http/1.1"
+  ],
+  "client-fingerprint": "chrome",
+  "network": "ws",
+  "ws-opts": {
+   "path": "/vmws?ed=2048",
+   "headers": {
+    "Host": "vm.example.com"
+   }
+  }
+ },
+ {
+  "name": "VMess gRPC",
+  "type": "vmess",
+  "server": "vm2.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555502",
+  "alterId": 0,
+  "cipher": "auto",
+  "tls": true,
+  "servername": "vm2.example.com",
+  "network": "grpc",
+  "grpc-opts": {
+   "grpc-service-name": "gunservice"
+  }
+ },
+ {
+  "name": "VMess H2",
+  "type": "vmess",
+  "server": "vm3.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555503",
+  "alterId": 0,
+  "cipher": "auto",
+  "tls": true,
+  "network": "h2",
+  "h2-opts": {
+   "host": [
+    "vm3.example.com"
+   ],
+   "path": "/h2"
+  }
+ },
+ {
+  "name": "VMess TCP HTTP",
+  "type": "vmess",
+  "server": "203.0.113.6",
+  "port": 80,
+  "uuid": "11111111-2222-3333-4444-555555555504",
+  "alterId": 0,
+  "cipher": "auto",
+  "network": "http",
+  "http-opts": {
+   "method": "GET",
+   "path": [
+    "/"
+   ],
+   "headers": {
+    "Host": [
+     "www.bing.com"
+    ]
+   }
+  }
+ },
+ {
+  "name": "VMess TCP",
+  "type": "vmess",
+  "server": "203.0.113.7",
+  "port": 10086,
+  "uuid": "11111111-2222-3333-4444-555555555505",
+  "alterId": 0,
+  "cipher": "auto"
+ },
+ {
+  "name": "VLESS Reality",
+  "type": "vless",
+  "server": "203.0.113.8",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555506",
+  "network": "tcp",
+  "tls": true,
+  "flow": "xtls-rprx-vision",
+  "servername": "www.microsoft.com",
+  "client-fingerprint": "chrome",
+  "reality-opts": {
+   "public-key": "cU8Zyhhd2KPM53Bth1s59kIkPBRb-D63eYMPCb_LDTQ",
+   "short-id": "0123abcd"
+  }
+ },
+ {
+  "name": "VLESS WS",
+  "type": "vless",
+  "server": "vl.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555507",
+  "network": "ws",
+  "tls": true,
+  "servername": "vl.example.com",
+  "ws-opts": {
+   "path": "/vlws",
+   "headers": {
+    "Host": "vl.example.com"
+   }
+  }
+ },
+ {
+  "name": "VLESS gRPC",
+  "type": "vless",
+  "server": "vl2.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555508",
+  "network": "grpc",
+  "tls": true,
+  "servername": "vl2.example.com",
+  "alpn": [
+   "h2"
+  ],
+  "grpc-opts": {
+   "grpc-service-name": "vlgrpc"
+  }
+ },
+ {
+  "name": "VLESS HTTPUpgrade",
+  "type": "vless",
+  "server": "vl3.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555509",
+  "network": "httpupgrade",
+  "tls": true,
+  "servername": "vl3.example.com",
+  "http-upgrade-opts": {
+   "path": "/up",
+   "host": "vl3.example.com"
+  }
+ },
+ {
+  "name": "Trojan TCP",
+  "type": "trojan",
+  "server": "tj.example.com",
+  "port": 443,
+  "password": "fakepass",
+  "sni": "tj.example.com",
+  "skip-cert-verify": true
+ },
+ {
+  "name": "Trojan WS",
+  "type": "trojan",
+  "server": "tj2.example.com",
+  "port": 443,
+  "password": "fakepass",
+  "sni": "tj2.example.com",
+  "network": "ws",
+  "ws-opts": {
+   "path": "/tjws",
+   "headers": {
+    "Host": "tj2.example.com"
+   }
+  }
+ },
+ {
+  "name": "Trojan gRPC",
+  "type": "trojan",
+  "server": "tj3.example.com",
+  "port": 443,
+  "password": "fakepass",
+  "sni": "tj3.example.com",
+  "network": "grpc",
+  "grpc-opts": {
+   "grpc-service-name": "tjgrpc"
+  }
+ },
+ {
+  "name": "Hysteria",
+  "type": "hysteria",
+  "server": "hy.example.com",
+  "port": 443,
+  "auth-str": "fakeauth",
+  "sni": "hy.example.com",
+  "up": 50,
+  "down": 200,
+  "alpn": [
+   "h3"
+  ],
+  "protocol": "udp"
+ },
+ {
+  "name": "Hysteria2 hop",
+  "type": "hysteria2",
+  "server": "hy2.example.com",
+  "port": 443,
+  "ports": "20000-30000",
+  "password": "fakepass",
+  "sni": "hy2.example.com",
+  "obfs": "salamander",
+  "obfs-password": "obfsfake"
+ },
+ {
+  "name": "HY2 short",
+  "type": "hysteria2",
+  "server": "hy3.example.com",
+  "port": 8443,
+  "password": "fakepass",
+  "sni": "hy3.example.com",
+  "skip-cert-verify": true
+ },
+ {
+  "name": "TUIC v5",
+  "type": "tuic",
+  "server": "tuic.example.com",
+  "port": 443,
+  "uuid": "11111111-2222-3333-4444-555555555510",
+  "password": "fakepass",
+  "alpn": [
+   "h3"
+  ],
+  "congestion-controller": "bbr",
+  "udp-relay-mode": "native",
+  "sni": "tuic.example.com"
+ },
+ {
+  "name": "AnyTLS",
+  "type": "anytls",
+  "server": "any.example.com",
+  "port": 443,
+  "password": "fakepass",
+  "sni": "any.example.com",
+  "client-fingerprint": "chrome"
+ },
+ {
+  "name": "WireGuard",
+  "type": "wireguard",
+  "server": "203.0.113.9",
+  "port": 51820,
+  "private-key": "eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=",
+  "public-key": "Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=",
+  "ip": "172.16.0.2",
+  "ipv6": "fd01::2",
+  "mtu": 1280
+ },
+ {
+  "name": "SOCKS5",
+  "type": "socks5",
+  "server": "203.0.113.10",
+  "port": 1080,
+  "username": "u",
+  "password": "p"
+ },
+ {
+  "name": "HTTPS proxy",
+  "type": "http",
+  "server": "203.0.113.11",
+  "port": 443,
+  "username": "u",
+  "password": "p",
+  "tls": true
+ }
+]

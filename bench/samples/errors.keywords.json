@@ -1,0 +1,36 @@
+{
+ "empty.txt": [
+  "empty"
+ ],
+ "html.txt": [
+  "html",
+  "web page",
+  "webpage",
+  "expired"
+ ],
+ "broken-yaml.yaml": [
+  "yaml",
+  "indent",
+  "mapping"
+ ],
+ "broken-json.json": [
+  "json"
+ ],
+ "bad-base64.txt": [
+  "base64",
+  "not a subscription",
+  "unrecognized",
+  "unknown format",
+  "no node"
+ ],
+ "no-nodes.yaml": [
+  "no node",
+  "no proxies",
+  "no proxy",
+  "empty"
+ ],
+ "bad-link.txt": [
+  "vmess",
+  "json"
+ ]
+}

@@ -33,7 +33,8 @@ struct Ctx<'a> {
 impl Ctx<'_> {
     fn add_remote_set(&mut self, tag: &str, url: String) {
         if self.rule_set_tags.insert(tag.to_string()) {
-            self.rule_sets.push(json!({"type": "remote", "tag": tag, "format": "binary", "url": url}));
+            self.rule_sets
+                .push(json!({"type": "remote", "tag": tag, "format": "binary", "url": url}));
         }
     }
 }
@@ -63,8 +64,12 @@ fn strs(v: &[String]) -> J {
 fn mbps(s: &Option<String>) -> J {
     let Some(s) = s else { return J::Null };
     let l = s.trim().to_ascii_lowercase();
-    let i = l.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(l.len());
-    let Ok(n) = l[..i].parse::<f64>() else { return J::Null };
+    let i = l
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(l.len());
+    let Ok(n) = l[..i].parse::<f64>() else {
+        return J::Null;
+    };
     let unit = l[i..].trim();
     let v = if unit.starts_with('g') {
         n * 1000.0
@@ -84,7 +89,11 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
         rule_set_tags: HashSet::new(),
         tags: HashSet::new(),
         providers_ok: HashSet::new(),
-        providers: cfg.rule_providers.iter().map(|p| (p.name.clone(), p.clone())).collect(),
+        providers: cfg
+            .rule_providers
+            .iter()
+            .map(|p| (p.name.clone(), p.clone()))
+            .collect(),
     };
     let fakeip = cfg
         .dns
@@ -116,9 +125,18 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
             && !ctx.tags.contains(&det)
             && !groups.iter().any(|g| g.name == det)
         {
-            let tag = o.get("tag").and_then(J::as_str).unwrap_or_default().to_string();
+            let tag = o
+                .get("tag")
+                .and_then(J::as_str)
+                .unwrap_or_default()
+                .to_string();
             if !tag.contains("/shadowtls") {
-                ctx.d.warn(Kind::FieldDropped, proxy_loc(&tag), Some("dialer-proxy"), format!("chain target {det:?} does not exist; removed"));
+                ctx.d.warn(
+                    Kind::FieldDropped,
+                    proxy_loc(&tag),
+                    Some("dialer-proxy"),
+                    format!("chain target {det:?} does not exist; removed"),
+                );
                 o.as_object_mut().unwrap().remove("detour");
             }
         }
@@ -136,8 +154,12 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
         group_out.extend(group_json(g, cfg, &group_names, &mut ctx, &mut outbounds));
     }
     // remove dangling group tags (groups that failed)
-    let produced: HashSet<String> = group_out.iter().filter_map(|g| g.get("tag").and_then(J::as_str).map(str::to_string)).collect();
-    ctx.tags.retain(|t| !group_names.contains(t) || produced.contains(t));
+    let produced: HashSet<String> = group_out
+        .iter()
+        .filter_map(|g| g.get("tag").and_then(J::as_str).map(str::to_string))
+        .collect();
+    ctx.tags
+        .retain(|t| !group_names.contains(t) || produced.contains(t));
     for g in &mut group_out {
         if let Some(arr) = g.get_mut("outbounds").and_then(J::as_array_mut) {
             arr.retain(|m| m.as_str().is_some_and(|s| ctx.tags.contains(s)));
@@ -153,11 +175,25 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
     }
 
     let clash_api = cfg.general.external_controller.is_some();
-    let mode = cfg.general.mode.clone().unwrap_or_else(|| "rule".into()).to_ascii_lowercase();
+    let mode = cfg
+        .general
+        .mode
+        .clone()
+        .unwrap_or_else(|| "rule".into())
+        .to_ascii_lowercase();
     let need_global = clash_api || mode == "global";
     if need_global && !ctx.tags.contains("GLOBAL") {
-        let mut members: Vec<String> = groups.iter().map(|g| g.name.clone()).filter(|n| ctx.tags.contains(n)).collect();
-        members.extend(cfg.proxies.iter().map(|p| p.name.clone()).filter(|n| ctx.tags.contains(n)));
+        let mut members: Vec<String> = groups
+            .iter()
+            .map(|g| g.name.clone())
+            .filter(|n| ctx.tags.contains(n))
+            .collect();
+        members.extend(
+            cfg.proxies
+                .iter()
+                .map(|p| p.name.clone())
+                .filter(|n| ctx.tags.contains(n)),
+        );
         members.push(DIRECT.into());
         group_out.push(json!({"type": "selector", "tag": "GLOBAL", "outbounds": members}));
         ctx.tags.insert("GLOBAL".into());
@@ -182,13 +218,19 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
     }
     let mut final_out: Option<String> = None;
     let mut resolved = fakeip;
-    let sub_rules: HashMap<&str, &Vec<Rule>> = cfg.sub_rules.iter().map(|(k, v)| (k.as_str(), v)).collect();
+    let sub_rules: HashMap<&str, &Vec<Rule>> =
+        cfg.sub_rules.iter().map(|(k, v)| (k.as_str(), v)).collect();
     for (i, r) in rules.iter().enumerate() {
         if let Matcher::Match = r.matcher {
             match action_for(&r.target, &ctx) {
                 Some(Action::Route(t)) => final_out = Some(t),
                 Some(Action::Reject(drop)) => route_rules.push(reject(drop, None)),
-                None => ctx.d.error(Kind::Unsupported, rule_loc(i, &r.raw), None, format!("target {:?} does not exist", r.target)),
+                None => ctx.d.error(
+                    Kind::Unsupported,
+                    rule_loc(i, &r.raw),
+                    None,
+                    format!("target {:?} does not exist", r.target),
+                ),
             }
             break;
         }
@@ -206,7 +248,12 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
                     })
                     .collect(),
                 None => {
-                    ctx.d.error(Kind::Invalid, rule_loc(i, &r.raw), None, format!("sub-rule {name:?} does not exist"));
+                    ctx.d.error(
+                        Kind::Invalid,
+                        rule_loc(i, &r.raw),
+                        None,
+                        format!("sub-rule {name:?} does not exist"),
+                    );
                     continue;
                 }
             },
@@ -216,12 +263,19 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
             let action = match action_for(&target, &ctx) {
                 Some(a) => a,
                 None => {
-                    ctx.d.error(Kind::Unsupported, rule_loc(i, &r.raw), None, format!("target {target:?} does not exist or was dropped"));
+                    ctx.d.error(
+                        Kind::Unsupported,
+                        rule_loc(i, &r.raw),
+                        None,
+                        format!("target {target:?} does not exist or was dropped"),
+                    );
                     continue;
                 }
             };
             let loc = rule_loc(i, &r.raw);
-            let Some(mut body) = matcher_json(&m, &mut ctx, &loc) else { continue };
+            let Some(mut body) = matcher_json(&m, &mut ctx, &loc) else {
+                continue;
+            };
             if !resolved && !r.no_resolve && needs_ip(&m) {
                 route_rules.push(json!({"action": "resolve"}));
                 resolved = true;
@@ -254,7 +308,10 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
     let mut route = Map::new();
     route.insert("rules".into(), J::Array(route_rules));
     if !ctx.rule_sets.is_empty() {
-        route.insert("rule_set".into(), J::Array(std::mem::take(&mut ctx.rule_sets)));
+        route.insert(
+            "rule_set".into(),
+            J::Array(std::mem::take(&mut ctx.rule_sets)),
+        );
     }
     let final_out = if mode == "global" {
         Some("GLOBAL".to_string())
@@ -266,7 +323,11 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
     if let Some(f) = final_out {
         route.insert("final".into(), json!(f));
     }
-    let auto_detect = cfg.tun.as_ref().and_then(|t| t.auto_detect_interface).unwrap_or(has_tun);
+    let auto_detect = cfg
+        .tun
+        .as_ref()
+        .and_then(|t| t.auto_detect_interface)
+        .unwrap_or(has_tun);
     if auto_detect {
         route.insert("auto_detect_interface".into(), json!(true));
     }
@@ -306,14 +367,23 @@ fn to_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> J {
         exp.insert(
             "clash_api".into(),
             obj(vec![
-                ("external_controller", opt_s(&cfg.general.external_controller)),
+                (
+                    "external_controller",
+                    opt_s(&cfg.general.external_controller),
+                ),
                 ("secret", opt_s(&cfg.general.secret)),
                 ("default_mode", json!(capitalize(&mode))),
             ]),
         );
     }
     if clash_api || fakeip {
-        exp.insert("cache_file".into(), obj(vec![("enabled", json!(true)), ("store_fakeip", if fakeip { json!(true) } else { J::Null })]));
+        exp.insert(
+            "cache_file".into(),
+            obj(vec![
+                ("enabled", json!(true)),
+                ("store_fakeip", if fakeip { json!(true) } else { J::Null }),
+            ]),
+        );
     }
     if !exp.is_empty() {
         root.insert("experimental".into(), J::Object(exp));
@@ -387,7 +457,9 @@ fn matcher_json(m: &Matcher, ctx: &mut Ctx, loc: &str) -> Option<J> {
             ctx.add_remote_set(&tag, rulesets::geosite_srs(p));
             one("rule_set", json!([tag]))
         }
-        Matcher::Geoip(p) if p.eq_ignore_ascii_case("LAN") || p.eq_ignore_ascii_case("private") => one("ip_is_private", json!(true)),
+        Matcher::Geoip(p) if p.eq_ignore_ascii_case("LAN") || p.eq_ignore_ascii_case("private") => {
+            one("ip_is_private", json!(true))
+        }
         Matcher::Geoip(p) => {
             let tag = format!("geoip-{}", p.to_ascii_lowercase());
             ctx.add_remote_set(&tag, rulesets::geoip_srs(p));
@@ -413,14 +485,22 @@ fn matcher_json(m: &Matcher, ctx: &mut Ctx, loc: &str) -> Option<J> {
                 "REDIR" => "redir-in",
                 "TPROXY" => "tproxy-in",
                 _ => {
-                    ctx.d.error(Kind::Unsupported, loc, None, format!("IN-TYPE {p} has no sing-box inbound"));
+                    ctx.d.error(
+                        Kind::Unsupported,
+                        loc,
+                        None,
+                        format!("IN-TYPE {p} has no sing-box inbound"),
+                    );
                     return None;
                 }
             };
             one("inbound", json!([tag]))
         }
         Matcher::ProcessName(p) => {
-            if p.contains('.') && !p.to_ascii_lowercase().ends_with(".exe") && p.split('.').count() >= 3 {
+            if p.contains('.')
+                && !p.to_ascii_lowercase().ends_with(".exe")
+                && p.split('.').count() >= 3
+            {
                 // Android package names are matched by PROCESS-NAME in mihomo
                 Some(json!({"package_name": [p]}))
             } else {
@@ -431,13 +511,29 @@ fn matcher_json(m: &Matcher, ctx: &mut Ctx, loc: &str) -> Option<J> {
         Matcher::ProcessPathRegex(p) => one("process_path_regex", json!([p])),
         Matcher::ProcessNameRegex(p) => {
             let body = p.trim_start_matches('^').trim_end_matches('$');
-            ctx.d.info(Kind::Approximated, loc, None, "PROCESS-NAME-REGEX is matched against the end of the process path");
-            one("process_path_regex", json!([format!("(^|[/\\\\])(?:{body})$")]))
+            ctx.d.info(
+                Kind::Approximated,
+                loc,
+                None,
+                "PROCESS-NAME-REGEX is matched against the end of the process path",
+            );
+            one(
+                "process_path_regex",
+                json!([format!("(^|[/\\\\])(?:{body})$")]),
+            )
         }
         Matcher::Uid(p) => {
-            let ids: Vec<u64> = p.split(['/', ',']).filter_map(|x| x.trim().parse().ok()).collect();
+            let ids: Vec<u64> = p
+                .split(['/', ','])
+                .filter_map(|x| x.trim().parse().ok())
+                .collect();
             if ids.is_empty() {
-                ctx.d.error(Kind::Unsupported, loc, None, "UID ranges are not supported by sing-box");
+                ctx.d.error(
+                    Kind::Unsupported,
+                    loc,
+                    None,
+                    "UID ranges are not supported by sing-box",
+                );
                 return None;
             }
             one("user_id", json!(ids))
@@ -447,13 +543,26 @@ fn matcher_json(m: &Matcher, ctx: &mut Ctx, loc: &str) -> Option<J> {
             if ctx.providers_ok.contains(p) {
                 one("rule_set", json!([p]))
             } else {
-                let why = if ctx.providers.contains_key(p) { "could not be converted" } else { "does not exist" };
-                ctx.d.error(Kind::Unsupported, loc, None, format!("rule provider {p:?} {why}; rule dropped"));
+                let why = if ctx.providers.contains_key(p) {
+                    "could not be converted"
+                } else {
+                    "does not exist"
+                };
+                ctx.d.error(
+                    Kind::Unsupported,
+                    loc,
+                    None,
+                    format!("rule provider {p:?} {why}; rule dropped"),
+                );
                 None
             }
         }
         Matcher::And(v) | Matcher::Or(v) => {
-            let mode = if matches!(m, Matcher::And(_)) { "and" } else { "or" };
+            let mode = if matches!(m, Matcher::And(_)) {
+                "and"
+            } else {
+                "or"
+            };
             let mut subs = Vec::new();
             for x in v {
                 subs.push(matcher_json(x, ctx, loc)?);
@@ -470,12 +579,27 @@ fn matcher_json(m: &Matcher, ctx: &mut Ctx, loc: &str) -> Option<J> {
                 Some(json!({"type": "logical", "mode": "and", "rules": [inner], "invert": true}))
             }
         }
-        Matcher::IpAsn(_) | Matcher::SrcIpAsn(_) | Matcher::IpSuffix(_) | Matcher::InPort(_) | Matcher::Dscp(_) | Matcher::Other(..) => {
-            ctx.d.error(Kind::Unsupported, loc, None, "sing-box has no equivalent matcher; rule dropped");
+        Matcher::IpAsn(_)
+        | Matcher::SrcIpAsn(_)
+        | Matcher::IpSuffix(_)
+        | Matcher::InPort(_)
+        | Matcher::Dscp(_)
+        | Matcher::Other(..) => {
+            ctx.d.error(
+                Kind::Unsupported,
+                loc,
+                None,
+                "sing-box has no equivalent matcher; rule dropped",
+            );
             None
         }
         Matcher::SubRule(..) => {
-            ctx.d.error(Kind::Unsupported, loc, None, "nested SUB-RULE inside a logical rule; rule dropped");
+            ctx.d.error(
+                Kind::Unsupported,
+                loc,
+                None,
+                "nested SUB-RULE inside a logical rule; rule dropped",
+            );
             None
         }
         Matcher::Match => Some(json!({})),
@@ -560,7 +684,10 @@ fn regex_escape(s: &str) -> String {
 
 fn provider_json(p: &RuleProvider, cfg: &Config, ctx: &mut Ctx) {
     let loc = format!("rule-provider {:?}", p.name);
-    let detour = p.proxy.clone().filter(|x| ctx.tags.contains(x) && x != DIRECT);
+    let detour = p
+        .proxy
+        .clone()
+        .filter(|x| ctx.tags.contains(x) && x != DIRECT);
     // 1) known public lists: use the sing-box build
     if let Some(url) = &p.url {
         let srs = if p.format.as_deref() == Some("srs") {
@@ -577,13 +704,23 @@ fn provider_json(p: &RuleProvider, cfg: &Config, ctx: &mut Ctx) {
                 ("format", json!("binary")),
                 ("url", json!(srs)),
                 ("download_detour", opt_s(&detour)),
-                ("update_interval", p.interval.map(|i| json!(format!("{i}s"))).unwrap_or(J::Null)),
+                (
+                    "update_interval",
+                    p.interval
+                        .map(|i| json!(format!("{i}s")))
+                        .unwrap_or(J::Null),
+                ),
             ]);
             if !ctx.rule_set_tags.insert(p.name.clone()) {
                 return;
             }
             if p.format.as_deref() != Some("srs") {
-                ctx.d.info(Kind::Approximated, &loc, Some("url"), "uses the sing-box (.srs) build of the same meta-rules-dat list");
+                ctx.d.info(
+                    Kind::Approximated,
+                    &loc,
+                    Some("url"),
+                    "uses the sing-box (.srs) build of the same meta-rules-dat list",
+                );
             }
             ctx.rule_sets.push(std::mem::take(&mut o));
             ctx.providers_ok.insert(p.name.clone());
@@ -605,14 +742,21 @@ fn provider_json(p: &RuleProvider, cfg: &Config, ctx: &mut Ctx) {
     // 2) inline payload (inline providers, or content supplied by the caller)
     if p.payload.is_empty() {
         let why = match p.format.as_deref() {
-            Some("mrs") => "it is a mihomo binary (.mrs) list with no known sing-box build".to_string(),
+            Some("mrs") => {
+                "it is a mihomo binary (.mrs) list with no known sing-box build".to_string()
+            }
             _ => format!(
                 "sing-box cannot read Clash {} lists; pass the list content with --provider {}=FILE to inline it",
                 p.format.as_deref().unwrap_or("yaml"),
                 p.name
             ),
         };
-        ctx.d.error(Kind::Unsupported, &loc, None, format!("not converted: {why}"));
+        ctx.d.error(
+            Kind::Unsupported,
+            &loc,
+            None,
+            format!("not converted: {why}"),
+        );
         return;
     }
     let mut rules: Vec<J> = Vec::new();
@@ -620,9 +764,18 @@ fn provider_json(p: &RuleProvider, cfg: &Config, ctx: &mut Ctx) {
         "domain" => {
             let (mut dom, mut suf, mut re) = (Vec::new(), Vec::new(), Vec::new());
             for e in &p.payload {
-                domain_entry(e.trim().trim_matches('\'').trim_matches('"'), &mut dom, &mut suf, &mut re);
+                domain_entry(
+                    e.trim().trim_matches('\'').trim_matches('"'),
+                    &mut dom,
+                    &mut suf,
+                    &mut re,
+                );
             }
-            rules.push(obj(vec![("domain", strs(&dom)), ("domain_suffix", strs(&suf)), ("domain_regex", strs(&re))]));
+            rules.push(obj(vec![
+                ("domain", strs(&dom)),
+                ("domain_suffix", strs(&suf)),
+                ("domain_regex", strs(&re)),
+            ]));
         }
         "ipcidr" => rules.push(json!({"ip_cidr": p.payload})),
         _ => {
@@ -668,18 +821,30 @@ fn provider_json(p: &RuleProvider, cfg: &Config, ctx: &mut Ctx) {
     }
     let _ = cfg;
     if rules.is_empty() {
-        ctx.d.error(Kind::Unsupported, &loc, None, "no entries could be converted");
+        ctx.d.error(
+            Kind::Unsupported,
+            &loc,
+            None,
+            "no entries could be converted",
+        );
         return;
     }
     if ctx.rule_set_tags.insert(p.name.clone()) {
-        ctx.rule_sets.push(json!({"type": "inline", "tag": p.name, "rules": rules}));
+        ctx.rule_sets
+            .push(json!({"type": "inline", "tag": p.name, "rules": rules}));
         ctx.providers_ok.insert(p.name.clone());
     }
 }
 
 // --------------------------------------------------------------- groups
 
-fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut Ctx, outbounds: &mut Vec<J>) -> Vec<J> {
+fn group_json(
+    g: &Group,
+    cfg: &Config,
+    group_names: &HashSet<String>,
+    ctx: &mut Ctx,
+    outbounds: &mut Vec<J>,
+) -> Vec<J> {
     let loc = group_loc(&g.name);
     if !g.use_providers.is_empty() || g.include_all_providers {
         ctx.d.warn(
@@ -709,7 +874,12 @@ fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut 
             .filter_map(|s| match regex::Regex::new(s) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    d.warn(Kind::FieldDropped, group_loc(&g.name), Some(field), format!("regex not understood ({e}); ignored"));
+                    d.warn(
+                        Kind::FieldDropped,
+                        group_loc(&g.name),
+                        Some(field),
+                        format!("regex not understood ({e}); ignored"),
+                    );
                     None
                 }
             })
@@ -720,7 +890,11 @@ fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut 
     let excl_types: Vec<String> = g
         .exclude_type
         .as_deref()
-        .map(|t| t.split('|').map(|x| x.trim().to_ascii_lowercase()).collect())
+        .map(|t| {
+            t.split('|')
+                .map(|x| x.trim().to_ascii_lowercase())
+                .collect()
+        })
         .unwrap_or_default();
     let is_proxy = |n: &str| cfg.proxies.iter().find(|p| p.name == n);
     members.retain(|m| {
@@ -743,14 +917,27 @@ fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut 
                 );
             }
             _ if ctx.tags.contains(&m) || group_names.contains(&m) => out_members.push(m),
-            _ => ctx.d.warn(Kind::FieldDropped, &loc, Some("proxies"), format!("member {m:?} does not exist or was dropped")),
+            _ => ctx.d.warn(
+                Kind::FieldDropped,
+                &loc,
+                Some("proxies"),
+                format!("member {m:?} does not exist or was dropped"),
+            ),
         }
     }
     if out_members.is_empty() {
-        ctx.d.warn(Kind::Approximated, &loc, None, "group has no usable members; DIRECT added so sing-box can load it");
+        ctx.d.warn(
+            Kind::Approximated,
+            &loc,
+            None,
+            "group has no usable members; DIRECT added so sing-box can load it",
+        );
         out_members.push(DIRECT.into());
     }
-    let interval = g.interval.map(|i| json!(format!("{i}s"))).unwrap_or(J::Null);
+    let interval = g
+        .interval
+        .map(|i| json!(format!("{i}s")))
+        .unwrap_or(J::Null);
     match &g.kind {
         GroupKind::Select => vec![obj(vec![
             ("type", json!("selector")),
@@ -781,7 +968,11 @@ fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut 
             let mut prev: Option<String> = None;
             let mut last = String::new();
             for (i, m) in out_members.iter().enumerate() {
-                let Some(src) = outbounds.iter().find(|o| o.get("tag").and_then(J::as_str) == Some(m.as_str())).cloned() else {
+                let Some(src) = outbounds
+                    .iter()
+                    .find(|o| o.get("tag").and_then(J::as_str) == Some(m.as_str()))
+                    .cloned()
+                else {
                     ctx.d.error(
                         Kind::Unsupported,
                         &loc,
@@ -804,7 +995,12 @@ fn group_json(g: &Group, cfg: &Config, group_names: &HashSet<String>, ctx: &mut 
             vec![json!({"type": "selector", "tag": g.name, "outbounds": [last]})]
         }
         GroupKind::Other(t) => {
-            ctx.d.warn(Kind::Approximated, &loc, Some("type"), format!("unknown group type `{t}`; converted to selector"));
+            ctx.d.warn(
+                Kind::Approximated,
+                &loc,
+                Some("type"),
+                format!("unknown group type `{t}`; converted to selector"),
+            );
             vec![json!({"type": "selector", "tag": g.name, "outbounds": out_members})]
         }
     }
@@ -821,32 +1017,81 @@ fn tls_json(t: &Tls, p: &Proxy, d: &mut Diagnostics) -> J {
     let loc = proxy_loc(&p.name);
     let mut utls = t.utls.clone().filter(|u| !u.is_empty() && u != "none");
     if t.reality.is_some() && utls.is_none() {
-        d.info(Kind::Approximated, &loc, Some("client-fingerprint"), "sing-box needs uTLS for REALITY; using chrome");
+        d.info(
+            Kind::Approximated,
+            &loc,
+            Some("client-fingerprint"),
+            "sing-box needs uTLS for REALITY; using chrome",
+        );
         utls = Some("chrome".into());
     }
     if let Some(u) = &utls
-        && !matches!(u.as_str(), "chrome" | "firefox" | "edge" | "safari" | "360" | "qq" | "ios" | "android" | "random" | "randomized")
+        && !matches!(
+            u.as_str(),
+            "chrome"
+                | "firefox"
+                | "edge"
+                | "safari"
+                | "360"
+                | "qq"
+                | "ios"
+                | "android"
+                | "random"
+                | "randomized"
+        )
     {
-        d.info(Kind::Approximated, &loc, Some("client-fingerprint"), format!("uTLS fingerprint `{u}` is unknown to sing-box; using chrome"));
+        d.info(
+            Kind::Approximated,
+            &loc,
+            Some("client-fingerprint"),
+            format!("uTLS fingerprint `{u}` is unknown to sing-box; using chrome"),
+        );
         utls = Some("chrome".into());
     }
     if t.cert_fingerprint.is_some() {
-        d.warn(Kind::FieldDropped, &loc, Some("fingerprint"), "certificate pinning has no sing-box 1.12 equivalent; dropped");
+        d.warn(
+            Kind::FieldDropped,
+            &loc,
+            Some("fingerprint"),
+            "certificate pinning has no sing-box 1.12 equivalent; dropped",
+        );
     }
     if t.client_cert.is_some() {
-        d.warn(Kind::FieldDropped, &loc, Some("certificate"), "client certificates are passed as file paths in mihomo; dropped");
+        d.warn(
+            Kind::FieldDropped,
+            &loc,
+            Some("certificate"),
+            "client certificates are passed as file paths in mihomo; dropped",
+        );
     }
     obj(vec![
         ("enabled", json!(true)),
         ("server_name", opt_s(&t.sni)),
         ("insecure", opt_b(t.insecure)),
         ("alpn", strs(&t.alpn)),
-        ("utls", utls.map(|f| json!({"enabled": true, "fingerprint": f})).unwrap_or(J::Null)),
+        (
+            "utls",
+            utls.map(|f| json!({"enabled": true, "fingerprint": f}))
+                .unwrap_or(J::Null),
+        ),
         (
             "reality",
             t.reality
                 .as_ref()
-                .map(|r| obj(vec![("enabled", json!(true)), ("public_key", json!(r.public_key)), ("short_id", if r.short_id.is_empty() { J::Null } else { json!(r.short_id) })]))
+                .map(|r| {
+                    obj(vec![
+                        ("enabled", json!(true)),
+                        ("public_key", json!(r.public_key)),
+                        (
+                            "short_id",
+                            if r.short_id.is_empty() {
+                                J::Null
+                            } else {
+                                json!(r.short_id)
+                            },
+                        ),
+                    ])
+                })
                 .unwrap_or(J::Null),
         ),
         (
@@ -861,7 +1106,13 @@ fn tls_json(t: &Tls, p: &Proxy, d: &mut Diagnostics) -> J {
                             "config",
                             e.config
                                 .as_ref()
-                                .map(|c| json!(["-----BEGIN ECH CONFIGS-----", c, "-----END ECH CONFIGS-----"]))
+                                .map(|c| {
+                                    json!([
+                                        "-----BEGIN ECH CONFIGS-----",
+                                        c,
+                                        "-----END ECH CONFIGS-----"
+                                    ])
+                                })
                                 .unwrap_or(J::Null),
                         ),
                     ])
@@ -891,7 +1142,8 @@ fn transport_json(t: &Transport, p: &Proxy, d: &mut Diagnostics) -> Result<J, St
             early_data_header,
         } => {
             // `/path?ed=2048` early-data syntax (Xray) to sing-box fields
-            let (mut path, mut ed, mut edh) = (path.clone(), *max_early_data, early_data_header.clone());
+            let (mut path, mut ed, mut edh) =
+                (path.clone(), *max_early_data, early_data_header.clone());
             if let Some((base, q)) = path.clone().split_once('?')
                 && let Some(v) = q.split('&').find_map(|kv| kv.strip_prefix("ed="))
                 && let Ok(n) = v.parse::<u32>()
@@ -908,17 +1160,38 @@ fn transport_json(t: &Transport, p: &Proxy, d: &mut Diagnostics) -> Result<J, St
                 ("early_data_header_name", opt_s(&edh)),
             ])
         }
-        Transport::HttpUpgrade { path, host, headers } => obj(vec![
+        Transport::HttpUpgrade {
+            path,
+            host,
+            headers,
+        } => obj(vec![
             ("type", json!("httpupgrade")),
             ("host", opt_s(host)),
             ("path", json!(path)),
             ("headers", hdrs(headers, &None)),
         ]),
-        Transport::Grpc { service_name } => obj(vec![("type", json!("grpc")), ("service_name", json!(service_name))]),
-        Transport::H2 { hosts, path } => obj(vec![("type", json!("http")), ("host", strs(hosts)), ("path", json!(path))]),
-        Transport::Http { method, paths, hosts, headers } => {
+        Transport::Grpc { service_name } => obj(vec![
+            ("type", json!("grpc")),
+            ("service_name", json!(service_name)),
+        ]),
+        Transport::H2 { hosts, path } => obj(vec![
+            ("type", json!("http")),
+            ("host", strs(hosts)),
+            ("path", json!(path)),
+        ]),
+        Transport::Http {
+            method,
+            paths,
+            hosts,
+            headers,
+        } => {
             if paths.len() > 1 {
-                d.info(Kind::Approximated, proxy_loc(&p.name), Some("http-opts.path"), "sing-box takes one path; using the first");
+                d.info(
+                    Kind::Approximated,
+                    proxy_loc(&p.name),
+                    Some("http-opts.path"),
+                    "sing-box takes one path; using the first",
+                );
             }
             let mut h = Map::new();
             for (k, v) in headers {
@@ -933,14 +1206,21 @@ fn transport_json(t: &Transport, p: &Proxy, d: &mut Diagnostics) -> Result<J, St
             ])
         }
         Transport::Quic => json!({"type": "quic"}),
-        Transport::Xhttp { .. } => return Err("XHTTP transport is not supported by sing-box".into()),
+        Transport::Xhttp { .. } => {
+            return Err("XHTTP transport is not supported by sing-box".into());
+        }
     })
 }
 
 fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
     let loc = proxy_loc(&p.name);
     let unsupported = |d: &mut Diagnostics, why: &str| {
-        d.error(Kind::Unsupported, &loc, None, format!("node dropped: {why}"));
+        d.error(
+            Kind::Unsupported,
+            &loc,
+            None,
+            format!("node dropped: {why}"),
+        );
     };
     let mut o = Map::new();
     let mut extra_out: Vec<J> = Vec::new();
@@ -999,7 +1279,13 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             put!("method", json!(cipher));
             put!("password", json!(password));
             if *udp_over_tcp == Some(true) {
-                put!("udp_over_tcp", obj(vec![("enabled", json!(true)), ("version", opt_n(*udp_over_tcp_version))]));
+                put!(
+                    "udp_over_tcp",
+                    obj(vec![
+                        ("enabled", json!(true)),
+                        ("version", opt_n(*udp_over_tcp_version))
+                    ])
+                );
             }
             match plugin {
                 None => {}
@@ -1011,9 +1297,19 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                     }
                     put!("plugin_opts", json!(s));
                 }
-                Some(SsPlugin::V2ray { mode, tls, host, path, mux, .. }) => {
+                Some(SsPlugin::V2ray {
+                    mode,
+                    tls,
+                    host,
+                    path,
+                    mux,
+                    ..
+                }) => {
                     if mode != "websocket" {
-                        unsupported(d, &format!("v2ray-plugin mode `{mode}` is not supported by sing-box"));
+                        unsupported(
+                            d,
+                            &format!("v2ray-plugin mode `{mode}` is not supported by sing-box"),
+                        );
                         return None;
                     }
                     put!("plugin", json!("v2ray-plugin"));
@@ -1032,9 +1328,18 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                     }
                     put!("plugin_opts", json!(s));
                 }
-                Some(SsPlugin::ShadowTls { host, password, version }) => {
+                Some(SsPlugin::ShadowTls {
+                    host,
+                    password,
+                    version,
+                }) => {
                     let stag = format!("{}/shadowtls", p.name);
-                    let utls = p.tls.as_ref().and_then(|t| t.utls.clone()).or_else(|| p.extra.iter().find(|(k, _)| k == "client-fingerprint").and_then(|(_, v)| v.as_string()));
+                    let utls = p.tls.as_ref().and_then(|t| t.utls.clone()).or_else(|| {
+                        p.extra
+                            .iter()
+                            .find(|(k, _)| k == "client-fingerprint")
+                            .and_then(|(_, v)| v.as_string())
+                    });
                     extra_out.push(obj(vec![
                         ("type", json!("shadowtls")),
                         ("tag", json!(stag)),
@@ -1056,7 +1361,10 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                     o.remove("server_port");
                 }
                 Some(SsPlugin::Other { name, .. }) => {
-                    unsupported(d, &format!("shadowsocks plugin `{name}` is not supported by sing-box"));
+                    unsupported(
+                        d,
+                        &format!("shadowsocks plugin `{name}` is not supported by sing-box"),
+                    );
                     return None;
                 }
             }
@@ -1085,7 +1393,10 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             encryption,
         } => {
             if encryption.is_some() {
-                unsupported(d, "VLESS encryption (mlkem768x25519plus) is not supported by sing-box");
+                unsupported(
+                    d,
+                    "VLESS encryption (mlkem768x25519plus) is not supported by sing-box",
+                );
                 return None;
             }
             put!("uuid", json!(uuid));
@@ -1105,15 +1416,33 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             disable_mtu_discovery,
         } => {
             if protocol.as_deref().is_some_and(|x| x != "udp") {
-                unsupported(d, &format!("Hysteria transport `{}` is not supported by sing-box", protocol.as_deref().unwrap_or_default()));
+                unsupported(
+                    d,
+                    &format!(
+                        "Hysteria transport `{}` is not supported by sing-box",
+                        protocol.as_deref().unwrap_or_default()
+                    ),
+                );
                 return None;
             }
             if ports.is_some() {
-                d.warn(Kind::FieldDropped, &loc, Some("ports"), "port hopping for Hysteria v1 is not supported by sing-box; uses `port` only");
+                d.warn(
+                    Kind::FieldDropped,
+                    &loc,
+                    Some("ports"),
+                    "port hopping for Hysteria v1 is not supported by sing-box; uses `port` only",
+                );
             }
             put!("auth_str", opt_s(auth));
             put!("up_mbps", if up.is_some() { mbps(up) } else { json!(10) });
-            put!("down_mbps", if down.is_some() { mbps(down) } else { json!(50) });
+            put!(
+                "down_mbps",
+                if down.is_some() {
+                    mbps(down)
+                } else {
+                    json!(50)
+                }
+            );
             put!("obfs", opt_s(obfs));
             put!("recv_window_conn", opt_n(*recv_window_conn));
             put!("recv_window", opt_n(*recv_window));
@@ -1134,13 +1463,30 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                     .split([',', '/'])
                     .map(str::trim)
                     .filter(|x| !x.is_empty())
-                    .map(|x| if x.contains('-') { x.replace('-', ":") } else { format!("{x}:{x}") })
+                    .map(|x| {
+                        if x.contains('-') {
+                            x.replace('-', ":")
+                        } else {
+                            format!("{x}:{x}")
+                        }
+                    })
                     .collect();
                 put!("server_ports", json!(list));
-                put!("hop_interval", hop_interval.map(|h| json!(format!("{h}s"))).unwrap_or(J::Null));
+                put!(
+                    "hop_interval",
+                    hop_interval
+                        .map(|h| json!(format!("{h}s")))
+                        .unwrap_or(J::Null)
+                );
             }
             if let Some(ob) = obfs {
-                put!("obfs", obj(vec![("type", json!(ob)), ("password", opt_s(obfs_password))]));
+                put!(
+                    "obfs",
+                    obj(vec![
+                        ("type", json!(ob)),
+                        ("password", opt_s(obfs_password))
+                    ])
+                );
             }
             put!("up_mbps", mbps(up));
             put!("down_mbps", mbps(down));
@@ -1172,22 +1518,52 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             min_idle_session,
         } => {
             put!("password", json!(password));
-            put!("idle_session_check_interval", idle_session_check_interval.map(|v| json!(format!("{v}s"))).unwrap_or(J::Null));
-            put!("idle_session_timeout", idle_session_timeout.map(|v| json!(format!("{v}s"))).unwrap_or(J::Null));
+            put!(
+                "idle_session_check_interval",
+                idle_session_check_interval
+                    .map(|v| json!(format!("{v}s")))
+                    .unwrap_or(J::Null)
+            );
+            put!(
+                "idle_session_timeout",
+                idle_session_timeout
+                    .map(|v| json!(format!("{v}s")))
+                    .unwrap_or(J::Null)
+            );
             put!("min_idle_session", opt_n(*min_idle_session));
         }
         Protocol::WireGuard(wg) => {
             let mut addr = Vec::new();
             if let Some(ip) = &wg.ip {
-                addr.push(if ip.contains('/') { ip.clone() } else { format!("{ip}/32") });
+                addr.push(if ip.contains('/') {
+                    ip.clone()
+                } else {
+                    format!("{ip}/32")
+                });
             }
             if let Some(ip) = &wg.ipv6 {
-                addr.push(if ip.contains('/') { ip.clone() } else { format!("{ip}/128") });
+                addr.push(if ip.contains('/') {
+                    ip.clone()
+                } else {
+                    format!("{ip}/128")
+                });
             }
             if !wg.extra_peers.is_empty() {
-                d.warn(Kind::FieldDropped, &loc, Some("peers"), format!("{} extra peer(s) dropped; only the first peer is converted", wg.extra_peers.len()));
+                d.warn(
+                    Kind::FieldDropped,
+                    &loc,
+                    Some("peers"),
+                    format!(
+                        "{} extra peer(s) dropped; only the first peer is converted",
+                        wg.extra_peers.len()
+                    ),
+                );
             }
-            let allowed = if wg.allowed_ips.is_empty() { vec!["0.0.0.0/0".to_string(), "::/0".to_string()] } else { wg.allowed_ips.clone() };
+            let allowed = if wg.allowed_ips.is_empty() {
+                vec!["0.0.0.0/0".to_string(), "::/0".to_string()]
+            } else {
+                wg.allowed_ips.clone()
+            };
             let peer = obj(vec![
                 ("address", json!(p.server)),
                 ("port", json!(p.port)),
@@ -1195,7 +1571,10 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                 ("pre_shared_key", opt_s(&wg.pre_shared_key)),
                 ("allowed_ips", json!(allowed)),
                 ("persistent_keepalive_interval", opt_n(wg.keepalive)),
-                ("reserved", wg.reserved.as_ref().map(|r| json!(r)).unwrap_or(J::Null)),
+                (
+                    "reserved",
+                    wg.reserved.as_ref().map(|r| json!(r)).unwrap_or(J::Null),
+                ),
             ]);
             let ep = obj(vec![
                 ("type", json!("wireguard")),
@@ -1238,7 +1617,11 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
                 return None;
             }
         }
-        Protocol::Http { user, password, headers } => {
+        Protocol::Http {
+            user,
+            password,
+            headers,
+        } => {
             put!("username", opt_s(user));
             put!("password", opt_s(password));
             if !headers.is_empty() {
@@ -1253,12 +1636,18 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
     }
     if let Some(t) = &p.tls
         && t.enabled
-        && !matches!(p.protocol, Protocol::Shadowsocks { .. } | Protocol::Ssh { .. })
+        && !matches!(
+            p.protocol,
+            Protocol::Shadowsocks { .. } | Protocol::Ssh { .. }
+        )
     {
         put!("tls", tls_json(t, p, d));
     }
     if let Some(tr) = &p.transport
-        && matches!(p.protocol, Protocol::Vmess { .. } | Protocol::Vless { .. } | Protocol::Trojan { .. })
+        && matches!(
+            p.protocol,
+            Protocol::Vmess { .. } | Protocol::Vless { .. } | Protocol::Trojan { .. }
+        )
     {
         match transport_json(tr, p, d) {
             Ok(j) => put!("transport", j),
@@ -1268,11 +1657,20 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             }
         }
     }
-    if p.udp == Some(false) && !matches!(p.protocol, Protocol::Hysteria { .. } | Protocol::Hysteria2 { .. } | Protocol::Tuic { .. }) {
+    if p.udp == Some(false)
+        && !matches!(
+            p.protocol,
+            Protocol::Hysteria { .. } | Protocol::Hysteria2 { .. } | Protocol::Tuic { .. }
+        )
+    {
         put!("network", json!("tcp"));
     }
     // smux (mihomo) -> multiplex
-    if let Some(Value::Map(sm)) = p.extra.iter().find(|(k, _)| k == "smux").map(|(_, v)| v.clone())
+    if let Some(Value::Map(sm)) = p
+        .extra
+        .iter()
+        .find(|(k, _)| k == "smux")
+        .map(|(_, v)| v.clone())
         && crate::value::get(&sm, "enabled").and_then(Value::as_bool) == Some(true)
     {
         let g = |k: &str| crate::value::get(&sm, k);
@@ -1280,11 +1678,41 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
             "multiplex",
             obj(vec![
                 ("enabled", json!(true)),
-                ("protocol", g("protocol").and_then(Value::as_string).map(|s| json!(s)).unwrap_or(J::Null)),
-                ("max_connections", g("max-connections").and_then(Value::as_u64).map(|n| json!(n)).unwrap_or(J::Null)),
-                ("min_streams", g("min-streams").and_then(Value::as_u64).map(|n| json!(n)).unwrap_or(J::Null)),
-                ("max_streams", g("max-streams").and_then(Value::as_u64).map(|n| json!(n)).unwrap_or(J::Null)),
-                ("padding", g("padding").and_then(Value::as_bool).map(J::Bool).unwrap_or(J::Null)),
+                (
+                    "protocol",
+                    g("protocol")
+                        .and_then(Value::as_string)
+                        .map(|s| json!(s))
+                        .unwrap_or(J::Null)
+                ),
+                (
+                    "max_connections",
+                    g("max-connections")
+                        .and_then(Value::as_u64)
+                        .map(|n| json!(n))
+                        .unwrap_or(J::Null)
+                ),
+                (
+                    "min_streams",
+                    g("min-streams")
+                        .and_then(Value::as_u64)
+                        .map(|n| json!(n))
+                        .unwrap_or(J::Null)
+                ),
+                (
+                    "max_streams",
+                    g("max-streams")
+                        .and_then(Value::as_u64)
+                        .map(|n| json!(n))
+                        .unwrap_or(J::Null)
+                ),
+                (
+                    "padding",
+                    g("padding")
+                        .and_then(Value::as_bool)
+                        .map(J::Bool)
+                        .unwrap_or(J::Null)
+                ),
             ]),
         );
     }
@@ -1307,7 +1735,10 @@ fn proxy_json(p: &Proxy, resolver: &str, d: &mut Diagnostics) -> Option<Out> {
         if let Some(s) = strategy
             && p.server.parse::<std::net::IpAddr>().is_err()
         {
-            put!("domain_resolver", json!({"server": resolver, "strategy": s}));
+            put!(
+                "domain_resolver",
+                json!({"server": resolver, "strategy": s})
+            );
         }
     }
     let mut list = vec![J::Object(o)];
@@ -1327,7 +1758,13 @@ struct DnsBuild {
 
 impl DnsBuild {
     /// Adds a server from a mihomo DNS URL; returns its tag.
-    fn add(&mut self, url: &str, bootstrap: &Option<String>, d: &mut Diagnostics, tags: &HashSet<String>) -> Option<String> {
+    fn add(
+        &mut self,
+        url: &str,
+        bootstrap: &Option<String>,
+        d: &mut Diagnostics,
+        tags: &HashSet<String>,
+    ) -> Option<String> {
         if let Some(t) = self.by_url.get(url) {
             return Some(t.clone());
         }
@@ -1350,7 +1787,12 @@ impl DnsBuild {
                     if tags.contains(part) {
                         detour = Some(part.to_string());
                     } else {
-                        d.warn(Kind::FieldDropped, "dns", Some("nameserver"), format!("{url}: proxy {part:?} does not exist; queried directly"));
+                        d.warn(
+                            Kind::FieldDropped,
+                            "dns",
+                            Some("nameserver"),
+                            format!("{url}: proxy {part:?} does not exist; queried directly"),
+                        );
                     }
                 }
             }
@@ -1362,7 +1804,9 @@ impl DnsBuild {
                 return (h[..end].to_string(), port.filter(|&p| p != default));
             }
             match hp.rsplit_once(':') {
-                Some((h, p)) if !h.contains(':') => (h.to_string(), p.parse().ok().filter(|&p| p != default)),
+                Some((h, p)) if !h.contains(':') => {
+                    (h.to_string(), p.parse().ok().filter(|&p| p != default))
+                }
                 _ => (hp.to_string(), None),
             }
         };
@@ -1370,7 +1814,18 @@ impl DnsBuild {
             "system" | "local" => json!({"type": "local", "tag": tag}),
             "dhcp" => {
                 let iface = rest.trim_matches('/');
-                obj(vec![("type", json!("dhcp")), ("tag", json!(tag)), ("interface", if iface == "auto" || iface == "system" || iface.is_empty() { J::Null } else { json!(iface) })])
+                obj(vec![
+                    ("type", json!("dhcp")),
+                    ("tag", json!(tag)),
+                    (
+                        "interface",
+                        if iface == "auto" || iface == "system" || iface.is_empty() {
+                            J::Null
+                        } else {
+                            json!(iface)
+                        },
+                    ),
+                ])
             }
             "udp" | "tcp" | "tls" | "quic" => {
                 let default = match scheme.as_str() {
@@ -1378,7 +1833,12 @@ impl DnsBuild {
                     _ => 53,
                 };
                 let (h, port) = split_host_port(rest.trim_end_matches('/'), default);
-                obj(vec![("type", json!(scheme)), ("tag", json!(tag)), ("server", json!(h)), ("server_port", opt_n(port))])
+                obj(vec![
+                    ("type", json!(scheme)),
+                    ("tag", json!(tag)),
+                    ("server", json!(h)),
+                    ("server_port", opt_n(port)),
+                ])
             }
             "https" | "h3" => {
                 let (hp, path) = match rest.find('/') {
@@ -1391,16 +1851,32 @@ impl DnsBuild {
                     ("tag", json!(tag)),
                     ("server", json!(h)),
                     ("server_port", opt_n(port)),
-                    ("path", if path == "/dns-query" { J::Null } else { json!(path) }),
+                    (
+                        "path",
+                        if path == "/dns-query" {
+                            J::Null
+                        } else {
+                            json!(path)
+                        },
+                    ),
                 ])
             }
             "rcode" => return None,
             other => {
-                d.warn(Kind::FieldDropped, "dns", Some("nameserver"), format!("{url}: DNS scheme `{other}` is not supported; skipped"));
+                d.warn(
+                    Kind::FieldDropped,
+                    "dns",
+                    Some("nameserver"),
+                    format!("{url}: DNS scheme `{other}` is not supported; skipped"),
+                );
                 return None;
             }
         };
-        let host = server.get("server").and_then(J::as_str).unwrap_or("").to_string();
+        let host = server
+            .get("server")
+            .and_then(J::as_str)
+            .unwrap_or("")
+            .to_string();
         let o = server.as_object_mut().unwrap();
         if !host.is_empty() && host.parse::<std::net::IpAddr>().is_err() {
             match bootstrap {
@@ -1423,7 +1899,12 @@ impl DnsBuild {
 }
 
 fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
-    let proxy_tags: HashSet<String> = cfg.proxies.iter().map(|p| p.name.clone()).chain(cfg.groups.iter().map(|g| g.name.clone())).collect();
+    let proxy_tags: HashSet<String> = cfg
+        .proxies
+        .iter()
+        .map(|p| p.name.clone())
+        .chain(cfg.groups.iter().map(|g| g.name.clone()))
+        .collect();
     let mut b = DnsBuild {
         servers: Vec::new(),
         by_url: HashMap::new(),
@@ -1431,7 +1912,10 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
     };
     let local = json!({"type": "local", "tag": "dns-local"});
     let Some(dns) = cfg.dns.as_ref().filter(|x| x.enable) else {
-        return (json!({"servers": [local], "final": "dns-local"}), "dns-local".into());
+        return (
+            json!({"servers": [local], "final": "dns-local"}),
+            "dns-local".into(),
+        );
     };
     let d = &mut *ctx.d;
     // bootstrap: first plain-IP server from default-nameserver
@@ -1443,7 +1927,11 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
         }
     }
     let mut need_local = bootstrap.is_none();
-    let main: Vec<String> = dns.nameserver.iter().filter_map(|u| b.add(u, &bootstrap, d, &proxy_tags)).collect();
+    let main: Vec<String> = dns
+        .nameserver
+        .iter()
+        .filter_map(|u| b.add(u, &bootstrap, d, &proxy_tags))
+        .collect();
     if dns.nameserver.len() > 1 {
         d.info(Kind::Approximated, "dns", Some("nameserver"), "sing-box queries one server per rule; the first nameserver is the default, others are kept for policy use");
     }
@@ -1455,10 +1943,14 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
             "sing-box has no fallback/fallback-filter; fallback servers are not used",
         );
     }
-    let final_tag = main.first().cloned().or_else(|| bootstrap.clone()).unwrap_or_else(|| {
-        need_local = true;
-        "dns-local".into()
-    });
+    let final_tag = main
+        .first()
+        .cloned()
+        .or_else(|| bootstrap.clone())
+        .unwrap_or_else(|| {
+            need_local = true;
+            "dns-local".into()
+        });
     let resolver = if dns.proxy_server_nameserver.is_empty() {
         bootstrap.clone().unwrap_or_else(|| {
             need_local = true;
@@ -1474,10 +1966,20 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
             })
     };
     if !dns.direct_nameserver.is_empty() {
-        d.info(Kind::Approximated, "dns", Some("direct-nameserver"), "no sing-box equivalent; DIRECT connections use the normal DNS rules");
+        d.info(
+            Kind::Approximated,
+            "dns",
+            Some("direct-nameserver"),
+            "no sing-box equivalent; DIRECT connections use the normal DNS rules",
+        );
     }
     if dns.respect_rules == Some(true) {
-        d.info(Kind::Approximated, "dns", Some("respect-rules"), "no sing-box equivalent; use `detour` on DNS servers instead");
+        d.info(
+            Kind::Approximated,
+            "dns",
+            Some("respect-rules"),
+            "no sing-box equivalent; use `detour` on DNS servers instead",
+        );
     }
 
     let mut rules: Vec<J> = Vec::new();
@@ -1485,26 +1987,42 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
     let mut predefined = Map::new();
     for (h, ips) in &cfg.hosts {
         if h.contains('*') || h.starts_with("+.") {
-            d.warn(Kind::FieldDropped, "hosts", None, format!("wildcard host {h:?} is not supported by the sing-box hosts server"));
+            d.warn(
+                Kind::FieldDropped,
+                "hosts",
+                None,
+                format!("wildcard host {h:?} is not supported by the sing-box hosts server"),
+            );
             continue;
         }
         predefined.insert(h.clone(), json!(ips));
     }
     if !predefined.is_empty() && dns.use_hosts != Some(false) {
         let names: Vec<String> = predefined.keys().cloned().collect();
-        b.servers.push(json!({"type": "hosts", "tag": "dns-hosts", "predefined": predefined}));
+        b.servers
+            .push(json!({"type": "hosts", "tag": "dns-hosts", "predefined": predefined}));
         rules.push(json!({"domain": names, "server": "dns-hosts"}));
     }
     // nameserver-policy
     for (pat, servers) in &dns.nameserver_policy {
-        let Some(tag) = servers.iter().find_map(|u| b.add(u, &bootstrap, d, &proxy_tags)) else { continue };
+        let Some(tag) = servers
+            .iter()
+            .find_map(|u| b.add(u, &bootstrap, d, &proxy_tags))
+        else {
+            continue;
+        };
         for one in pat.split(',') {
             let one = one.trim();
             let body = if let Some(g) = one.strip_prefix("geosite:") {
                 let mut tags = Vec::new();
                 for name in g.split(',') {
                     let t = format!("geosite-{}", name.trim().to_ascii_lowercase());
-                    ctx_add_set(&mut ctx.rule_sets, &mut ctx.rule_set_tags, &t, rulesets::geosite_srs(name.trim()));
+                    ctx_add_set(
+                        &mut ctx.rule_sets,
+                        &mut ctx.rule_set_tags,
+                        &t,
+                        rulesets::geosite_srs(name.trim()),
+                    );
                     tags.push(t);
                 }
                 json!({"rule_set": tags})
@@ -1514,21 +2032,33 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
             } else {
                 let (mut dom, mut suf, mut re) = (Vec::new(), Vec::new(), Vec::new());
                 domain_entry(one, &mut dom, &mut suf, &mut re);
-                obj(vec![("domain", strs(&dom)), ("domain_suffix", strs(&suf)), ("domain_regex", strs(&re))])
+                obj(vec![
+                    ("domain", strs(&dom)),
+                    ("domain_suffix", strs(&suf)),
+                    ("domain_regex", strs(&re)),
+                ])
             };
             let mut body = body;
-            body.as_object_mut().unwrap().insert("server".into(), json!(tag));
+            body.as_object_mut()
+                .unwrap()
+                .insert("server".into(), json!(tag));
             rules.push(body);
         }
     }
     let mut servers_tail = Vec::new();
     if fakeip {
         if !dns.fake_ip_filter.is_empty() {
-            let (mut dom, mut suf, mut re, mut sets) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            let (mut dom, mut suf, mut re, mut sets) =
+                (Vec::new(), Vec::new(), Vec::new(), Vec::new());
             for f in &dns.fake_ip_filter {
                 if let Some(g) = f.strip_prefix("geosite:") {
                     let t = format!("geosite-{}", g.to_ascii_lowercase());
-                    ctx_add_set(&mut ctx.rule_sets, &mut ctx.rule_set_tags, &t, rulesets::geosite_srs(g));
+                    ctx_add_set(
+                        &mut ctx.rule_sets,
+                        &mut ctx.rule_set_tags,
+                        &t,
+                        rulesets::geosite_srs(g),
+                    );
                     sets.push(t);
                 } else if let Some(rs) = f.strip_prefix("rule-set:") {
                     sets.push(rs.to_string());
@@ -1537,14 +2067,33 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
                 }
             }
             let whitelist = dns.fake_ip_filter_mode.as_deref() == Some("whitelist");
-            let mut r = obj(vec![("domain", strs(&dom)), ("domain_suffix", strs(&suf)), ("domain_regex", strs(&re)), ("rule_set", strs(&sets))]);
-            r.as_object_mut().unwrap().insert("server".into(), json!(if whitelist { "dns-fakeip" } else { final_tag.as_str() }));
+            let mut r = obj(vec![
+                ("domain", strs(&dom)),
+                ("domain_suffix", strs(&suf)),
+                ("domain_regex", strs(&re)),
+                ("rule_set", strs(&sets)),
+            ]);
+            r.as_object_mut().unwrap().insert(
+                "server".into(),
+                json!(if whitelist {
+                    "dns-fakeip"
+                } else {
+                    final_tag.as_str()
+                }),
+            );
             if whitelist {
-                r.as_object_mut().unwrap().insert("query_type".into(), json!(["A", "AAAA"]));
+                r.as_object_mut()
+                    .unwrap()
+                    .insert("query_type".into(), json!(["A", "AAAA"]));
             }
             rules.push(r);
             if whitelist {
-                d.info(Kind::Approximated, "dns", Some("fake-ip-filter-mode"), "whitelist mode: only listed domains get fake IPs");
+                d.info(
+                    Kind::Approximated,
+                    "dns",
+                    Some("fake-ip-filter-mode"),
+                    "whitelist mode: only listed domains get fake IPs",
+                );
             }
         }
         if dns.fake_ip_filter_mode.as_deref() != Some("whitelist") {
@@ -1553,11 +2102,22 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
         servers_tail.push(obj(vec![
             ("type", json!("fakeip")),
             ("tag", json!("dns-fakeip")),
-            ("inet4_range", json!(dns.fake_ip_range.clone().unwrap_or_else(|| "198.18.0.1/16".into()))),
+            (
+                "inet4_range",
+                json!(
+                    dns.fake_ip_range
+                        .clone()
+                        .unwrap_or_else(|| "198.18.0.1/16".into())
+                ),
+            ),
             ("inet6_range", opt_s(&dns.fake_ip_range6)),
         ]));
     }
-    if need_local || b.servers.iter().any(|s| s.get("domain_resolver").and_then(J::as_str) == Some("dns-local")) {
+    if need_local
+        || b.servers
+            .iter()
+            .any(|s| s.get("domain_resolver").and_then(J::as_str) == Some("dns-local"))
+    {
         b.servers.push(local);
     }
     b.servers.extend(servers_tail);
@@ -1569,7 +2129,14 @@ fn dns_json(cfg: &Config, fakeip: bool, ctx: &mut Ctx) -> (J, String) {
     (
         obj(vec![
             ("servers", J::Array(b.servers)),
-            ("rules", if rules.is_empty() { J::Null } else { J::Array(rules) }),
+            (
+                "rules",
+                if rules.is_empty() {
+                    J::Null
+                } else {
+                    J::Array(rules)
+                },
+            ),
             ("final", json!(final_tag)),
             ("strategy", strategy.map(|s| json!(s)).unwrap_or(J::Null)),
         ]),
@@ -1589,25 +2156,44 @@ fn fix_dns_rule_set_refs(root: &mut J, d: &mut Diagnostics) {
     let known: HashSet<String> = root
         .pointer("/route/rule_set")
         .and_then(J::as_array)
-        .map(|a| a.iter().filter_map(|r| r.get("tag").and_then(J::as_str).map(str::to_string)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|r| r.get("tag").and_then(J::as_str).map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
-    let Some(rules) = root.get_mut("dns").and_then(|x| x.get_mut("rules")).and_then(J::as_array_mut) else { return };
+    let Some(rules) = root
+        .get_mut("dns")
+        .and_then(|x| x.get_mut("rules"))
+        .and_then(J::as_array_mut)
+    else {
+        return;
+    };
     rules.retain_mut(|r| {
         let o = r.as_object_mut().unwrap();
         o.remove("_provider");
-        let Some(sets) = o.get_mut("rule_set").and_then(J::as_array_mut) else { return true };
+        let Some(sets) = o.get_mut("rule_set").and_then(J::as_array_mut) else {
+            return true;
+        };
         sets.retain(|t| {
             let t = t.as_str().unwrap_or_default();
             let ok = known.contains(t);
             if !ok {
-                d.warn(Kind::FieldDropped, "dns", None, format!("rule-set:{t} could not be converted; removed from the DNS rule"));
+                d.warn(
+                    Kind::FieldDropped,
+                    "dns",
+                    None,
+                    format!("rule-set:{t} could not be converted; removed from the DNS rule"),
+                );
             }
             ok
         });
         if sets.is_empty() {
             o.remove("rule_set");
             // nothing left to match on: drop the rule rather than match everything
-            return o.keys().any(|k| !matches!(k.as_str(), "server" | "query_type" | "action"));
+            return o
+                .keys()
+                .any(|k| !matches!(k.as_str(), "server" | "query_type" | "action"));
         }
         true
     });
@@ -1618,7 +2204,10 @@ fn fix_dns_rule_set_refs(root: &mut J, d: &mut Diagnostics) {
 fn inbounds_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Vec<J> {
     let g = &cfg.general;
     let listen = if g.allow_lan == Some(true) {
-        g.bind_address.clone().filter(|b| b != "*").unwrap_or_else(|| "::".into())
+        g.bind_address
+            .clone()
+            .filter(|b| b != "*")
+            .unwrap_or_else(|| "::".into())
     } else {
         "127.0.0.1".into()
     };
@@ -1634,7 +2223,12 @@ fn inbounds_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Ve
     add("redirect", "redir-in", g.redir_port);
     add("tproxy", "tproxy-in", g.tproxy_port);
     if let Some(t) = cfg.tun.as_ref().filter(|t| t.enable) {
-        let mut addr: Vec<String> = t.inet4_address.iter().chain(t.inet6_address.iter()).cloned().collect();
+        let mut addr: Vec<String> = t
+            .inet4_address
+            .iter()
+            .chain(t.inet6_address.iter())
+            .cloned()
+            .collect();
         if addr.is_empty() {
             addr = vec!["172.19.0.1/30".into(), "fdfe:dcba:9876::1/126".into()];
         }
@@ -1653,8 +2247,15 @@ fn inbounds_json(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Ve
         ]));
     }
     if v.is_empty() && opts.add_defaults {
-        d.info(Kind::Repaired, "inbounds", None, "the input has no listening ports; added a mixed inbound on 127.0.0.1:7890");
-        v.push(json!({"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 7890}));
+        d.info(
+            Kind::Repaired,
+            "inbounds",
+            None,
+            "the input has no listening ports; added a mixed inbound on 127.0.0.1:7890",
+        );
+        v.push(
+            json!({"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 7890}),
+        );
     }
     v
 }

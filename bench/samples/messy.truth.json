@@ -1,0 +1,18 @@
+{
+ "valid": [
+  "M1 port as string",
+  "M2 upper-case type",
+  "M3 unknown field",
+  "M6 duplicate",
+  "M6 duplicate (2)",
+  "M7 password number",
+  "M8 ws-path legacy",
+  "M10 tab\tin name"
+ ],
+ "invalid": [
+  "M4 missing port",
+  "M5 unknown type",
+  "M9 bad uuid"
+ ],
+ "note": "M6 appears twice with different servers; both should survive (one renamed). M5 (mieru) is valid for mihomo but has no sing-box counterpart."
+}

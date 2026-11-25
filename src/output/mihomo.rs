@@ -39,7 +39,11 @@ fn hdr_map(h: &[(String, String)], host: &Option<String>) -> Option<Value> {
     for (k, v) in h {
         m.push((k.clone(), Value::str(v.clone())));
     }
-    if m.is_empty() { None } else { Some(Value::Map(m)) }
+    if m.is_empty() {
+        None
+    } else {
+        Some(Value::Map(m))
+    }
 }
 
 fn to_map(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Map {
@@ -60,7 +64,12 @@ fn to_map(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Map {
     put_s(&mut m, "find-process-mode", &g.find_process_mode);
     put_s(&mut m, "interface-name", &g.interface_name);
     put_n(&mut m, "routing-mark", g.routing_mark);
-    if cfg.source != SourceFormat::Links && cfg.source != SourceFormat::SingBox && m.is_empty() && opts.add_defaults && cfg.extra.is_empty() {
+    if cfg.source != SourceFormat::Links
+        && cfg.source != SourceFormat::SingBox
+        && m.is_empty()
+        && opts.add_defaults
+        && cfg.extra.is_empty()
+    {
         // a bare proxy list: nothing to add
     }
     for (k, v) in &cfg.extra {
@@ -72,7 +81,16 @@ fn to_map(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Map {
             Value::Map(
                 cfg.hosts
                     .iter()
-                    .map(|(k, v)| (k.clone(), if v.len() == 1 { Value::str(v[0].clone()) } else { Value::seq_str(v.iter().cloned()) }))
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            if v.len() == 1 {
+                                Value::str(v[0].clone())
+                            } else {
+                                Value::seq_str(v.iter().cloned())
+                            },
+                        )
+                    })
                     .collect(),
             ),
         ));
@@ -83,23 +101,47 @@ fn to_map(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> Map {
     if let Some(dns) = &cfg.dns {
         m.push(("dns".into(), Value::Map(dns_map(dns))));
     }
-    m.push(("proxies".into(), Value::Seq(cfg.proxies.iter().map(|p| Value::Map(proxy_map(p))).collect())));
+    m.push((
+        "proxies".into(),
+        Value::Seq(
+            cfg.proxies
+                .iter()
+                .map(|p| Value::Map(proxy_map(p)))
+                .collect(),
+        ),
+    ));
     if !cfg.proxy_providers.is_empty() {
-        m.push(("proxy-providers".into(), Value::Map(cfg.proxy_providers.clone())));
+        m.push((
+            "proxy-providers".into(),
+            Value::Map(cfg.proxy_providers.clone()),
+        ));
     }
     let (groups, rules) = crate::output::default_groups(cfg, opts, d);
-    m.push(("proxy-groups".into(), Value::Seq(groups.iter().map(|g| Value::Map(group_map(g))).collect())));
+    m.push((
+        "proxy-groups".into(),
+        Value::Seq(groups.iter().map(|g| Value::Map(group_map(g))).collect()),
+    ));
     if !cfg.rule_providers.is_empty() {
         m.push((
             "rule-providers".into(),
-            Value::Map(cfg.rule_providers.iter().map(|r| (r.name.clone(), Value::Map(provider_map(r, d)))).collect()),
+            Value::Map(
+                cfg.rule_providers
+                    .iter()
+                    .map(|r| (r.name.clone(), Value::Map(provider_map(r, d))))
+                    .collect(),
+            ),
         ));
     }
     m.push(("rules".into(), Value::seq_str(rules.iter().map(rule_text))));
     if !cfg.sub_rules.is_empty() {
         m.push((
             "sub-rules".into(),
-            Value::Map(cfg.sub_rules.iter().map(|(k, rs)| (k.clone(), Value::seq_str(rs.iter().map(rule_text)))).collect()),
+            Value::Map(
+                cfg.sub_rules
+                    .iter()
+                    .map(|(k, rs)| (k.clone(), Value::seq_str(rs.iter().map(rule_text))))
+                    .collect(),
+            ),
         ));
     }
     m
@@ -138,7 +180,11 @@ fn dns_map(dns: &Dns) -> Map {
     put_list(&mut m, "default-nameserver", &dns.default_nameserver);
     put_list(&mut m, "nameserver", &dns.nameserver);
     put_list(&mut m, "fallback", &dns.fallback);
-    put_list(&mut m, "proxy-server-nameserver", &dns.proxy_server_nameserver);
+    put_list(
+        &mut m,
+        "proxy-server-nameserver",
+        &dns.proxy_server_nameserver,
+    );
     put_list(&mut m, "direct-nameserver", &dns.direct_nameserver);
     if !dns.nameserver_policy.is_empty() {
         m.push((
@@ -146,7 +192,16 @@ fn dns_map(dns: &Dns) -> Map {
             Value::Map(
                 dns.nameserver_policy
                     .iter()
-                    .map(|(k, v)| (k.clone(), if v.len() == 1 { Value::str(v[0].clone()) } else { Value::seq_str(v.iter().cloned()) }))
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            if v.len() == 1 {
+                                Value::str(v[0].clone())
+                            } else {
+                                Value::seq_str(v.iter().cloned())
+                            },
+                        )
+                    })
                     .collect(),
             ),
         ));
@@ -200,7 +255,11 @@ pub fn proxy_map(p: &Proxy) -> Map {
                         put_b(&mut o, "skip-cert-verify", *skip_cert_verify);
                         ("v2ray-plugin".to_string(), Value::Map(o))
                     }
-                    SsPlugin::ShadowTls { host, password, version } => {
+                    SsPlugin::ShadowTls {
+                        host,
+                        password,
+                        version,
+                    } => {
                         let mut o: Map = vec![("host".into(), Value::str(host.clone()))];
                         put_s(&mut o, "password", password);
                         o.push(("version".into(), Value::int(*version as i64)));
@@ -320,7 +379,11 @@ pub fn proxy_map(p: &Proxy) -> Map {
             min_idle_session,
         } => {
             m.push(("password".into(), Value::str(password.clone())));
-            put_n(&mut m, "idle-session-check-interval", *idle_session_check_interval);
+            put_n(
+                &mut m,
+                "idle-session-check-interval",
+                *idle_session_check_interval,
+            );
             put_n(&mut m, "idle-session-timeout", *idle_session_timeout);
             put_n(&mut m, "min-idle-session", *min_idle_session);
         }
@@ -332,7 +395,10 @@ pub fn proxy_map(p: &Proxy) -> Map {
             put_s(&mut m, "ipv6", &wg.ipv6);
             put_list(&mut m, "allowed-ips", &wg.allowed_ips);
             if let Some(r) = &wg.reserved {
-                m.push(("reserved".into(), Value::Seq(r.iter().map(|b| Value::int(*b as i64)).collect())));
+                m.push((
+                    "reserved".into(),
+                    Value::Seq(r.iter().map(|b| Value::int(*b as i64)).collect()),
+                ));
             }
             put_n(&mut m, "mtu", wg.mtu);
             put_n(&mut m, "persistent-keepalive", wg.keepalive);
@@ -359,7 +425,11 @@ pub fn proxy_map(p: &Proxy) -> Map {
             put_s(&mut m, "username", user);
             put_s(&mut m, "password", password);
         }
-        Protocol::Http { user, password, headers } => {
+        Protocol::Http {
+            user,
+            password,
+            headers,
+        } => {
             put_s(&mut m, "username", user);
             put_s(&mut m, "password", password);
             if let Some(h) = hdr_map(headers, &None) {
@@ -400,12 +470,20 @@ pub fn proxy_map(p: &Proxy) -> Map {
     if let Some(t) = &p.tls {
         let implicit = matches!(
             p.protocol,
-            Protocol::Trojan { .. } | Protocol::Hysteria { .. } | Protocol::Hysteria2 { .. } | Protocol::Tuic { .. } | Protocol::AnyTls { .. }
+            Protocol::Trojan { .. }
+                | Protocol::Hysteria { .. }
+                | Protocol::Hysteria2 { .. }
+                | Protocol::Tuic { .. }
+                | Protocol::AnyTls { .. }
         );
         if t.enabled && !implicit {
             m.push(("tls".into(), Value::bool(true)));
         }
-        let sni_key = if matches!(p.protocol, Protocol::Vmess { .. } | Protocol::Vless { .. }) { "servername" } else { "sni" };
+        let sni_key = if matches!(p.protocol, Protocol::Vmess { .. } | Protocol::Vless { .. }) {
+            "servername"
+        } else {
+            "sni"
+        };
         put_s(&mut m, sni_key, &t.sni);
         put_b(&mut m, "skip-cert-verify", t.insecure);
         put_list(&mut m, "alpn", &t.alpn);
@@ -450,7 +528,11 @@ pub fn proxy_map(p: &Proxy) -> Map {
                 put_s(&mut o, "early-data-header-name", early_data_header);
                 m.push(("ws-opts".into(), Value::Map(o)));
             }
-            Transport::HttpUpgrade { path, host, headers } => {
+            Transport::HttpUpgrade {
+                path,
+                host,
+                headers,
+            } => {
                 let mut o: Map = vec![("path".into(), Value::str(path.clone()))];
                 if let Some(h) = hdr_map(headers, host) {
                     o.push(("headers".into(), h));
@@ -459,7 +541,13 @@ pub fn proxy_map(p: &Proxy) -> Map {
                 m.push(("ws-opts".into(), Value::Map(o)));
             }
             Transport::Grpc { service_name } => {
-                m.push(("grpc-opts".into(), Value::Map(vec![("grpc-service-name".into(), Value::str(service_name.clone()))])));
+                m.push((
+                    "grpc-opts".into(),
+                    Value::Map(vec![(
+                        "grpc-service-name".into(),
+                        Value::str(service_name.clone()),
+                    )]),
+                ));
             }
             Transport::H2 { hosts, path } => {
                 let mut o: Map = Vec::new();
@@ -488,7 +576,12 @@ pub fn proxy_map(p: &Proxy) -> Map {
                 }
                 m.push(("http-opts".into(), Value::Map(o)));
             }
-            Transport::Xhttp { path, host, mode, raw } => {
+            Transport::Xhttp {
+                path,
+                host,
+                mode,
+                raw,
+            } => {
                 let mut o = raw.as_map().cloned().unwrap_or_default();
                 set(&mut o, "path", Value::str(path.clone()));
                 if let Some(h) = host {
@@ -558,7 +651,12 @@ fn group_map(g: &Group) -> Map {
     put_b(&mut m, "hidden", g.hidden);
     put_s(&mut m, "icon", &g.icon);
     m.extend(g.extra.iter().cloned());
-    if g.members.is_empty() && g.use_providers.is_empty() && !g.include_all && !g.include_all_proxies && !g.include_all_providers {
+    if g.members.is_empty()
+        && g.use_providers.is_empty()
+        && !g.include_all
+        && !g.include_all_proxies
+        && !g.include_all_providers
+    {
         m.push(("proxies".into(), Value::seq_str(["DIRECT"])));
     }
     m
@@ -608,7 +706,14 @@ pub fn matcher_text(m: &Matcher) -> Option<String> {
         Matcher::Geosite(p) => ("GEOSITE", p.clone()),
         Matcher::Geoip(p) => ("GEOIP", p.clone()),
         Matcher::SrcGeoip(p) => ("SRC-GEOIP", p.clone()),
-        Matcher::IpCidr(p) => (if p.contains(':') { "IP-CIDR6" } else { "IP-CIDR" }, p.clone()),
+        Matcher::IpCidr(p) => (
+            if p.contains(':') {
+                "IP-CIDR6"
+            } else {
+                "IP-CIDR"
+            },
+            p.clone(),
+        ),
         Matcher::SrcIpCidr(p) => ("SRC-IP-CIDR", p.clone()),
         Matcher::IpAsn(p) => ("IP-ASN", p.clone()),
         Matcher::SrcIpAsn(p) => ("SRC-IP-ASN", p.clone()),
@@ -638,7 +743,10 @@ pub fn matcher_text(m: &Matcher) -> Option<String> {
 }
 
 fn logical(v: &[Matcher]) -> Option<String> {
-    let parts: Option<Vec<String>> = v.iter().map(|m| matcher_text(m).map(|t| format!("({t})"))).collect();
+    let parts: Option<Vec<String>> = v
+        .iter()
+        .map(|m| matcher_text(m).map(|t| format!("({t})")))
+        .collect();
     Some(format!("({})", parts?.join(",")))
 }
 
@@ -646,7 +754,9 @@ fn logical(v: &[Matcher]) -> Option<String> {
 pub fn rule_text(r: &Rule) -> String {
     let mut s = match &r.matcher {
         Matcher::Match => format!("MATCH,{}", r.target),
-        Matcher::SubRule(_, name) => format!("{},{}", matcher_text(&r.matcher).unwrap_or_default(), name),
+        Matcher::SubRule(_, name) => {
+            format!("{},{}", matcher_text(&r.matcher).unwrap_or_default(), name)
+        }
         m => format!("{},{}", matcher_text(m).unwrap_or_default(), r.target),
     };
     if r.src {

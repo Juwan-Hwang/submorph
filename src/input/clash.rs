@@ -26,7 +26,13 @@ pub fn from_value(root: Value, source: SourceFormat, d: &mut Diagnostics) -> Con
         cfg.proxy_providers = pp;
     }
     if let Some(v) = take(&mut m, "proxy-groups") {
-        for (i, g) in v.as_seq().cloned().unwrap_or_default().into_iter().enumerate() {
+        for (i, g) in v
+            .as_seq()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .enumerate()
+        {
             match parse_group(g) {
                 Ok(g) => cfg.groups.push(g),
                 Err(e) => d.error(Kind::Invalid, format!("proxy-groups[{i}]"), None, e),
@@ -71,13 +77,17 @@ pub fn from_value(root: Value, source: SourceFormat, d: &mut Diagnostics) -> Con
     g.secret = take(&mut m, "secret").and_then(|v| v.as_string());
     g.find_process_mode = take(&mut m, "find-process-mode").and_then(|v| v.as_string());
     g.interface_name = take(&mut m, "interface-name").and_then(|v| v.as_string());
-    g.routing_mark = take(&mut m, "routing-mark").and_then(|v| v.as_u64()).map(|n| n as u32);
+    g.routing_mark = take(&mut m, "routing-mark")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32);
     cfg.extra = m;
     cfg
 }
 
 fn port_of(v: Option<Value>) -> Option<u16> {
-    v.and_then(|v| v.as_u64()).and_then(|n| u16::try_from(n).ok()).filter(|&p| p > 0)
+    v.and_then(|v| v.as_u64())
+        .and_then(|n| u16::try_from(n).ok())
+        .filter(|&p| p > 0)
 }
 
 /// Parses the `proxies` list, skipping (and reporting) invalid entries and
@@ -92,13 +102,20 @@ pub fn parse_proxies(v: &Value, d: &mut Diagnostics) -> Vec<Proxy> {
     };
     for (i, item) in items.iter().enumerate() {
         let Some(m) = item.as_map() else {
-            d.error(Kind::Invalid, format!("proxies[{i}]"), None, "entry is not a mapping");
+            d.error(
+                Kind::Invalid,
+                format!("proxies[{i}]"),
+                None,
+                "entry is not a mapping",
+            );
             continue;
         };
         match parse_proxy(m.clone(), d) {
             Ok(p) => push_unique(&mut out, p, d),
             Err(e) => {
-                let name = get(m, "name").and_then(Value::as_string).unwrap_or_else(|| format!("proxies[{i}]"));
+                let name = get(m, "name")
+                    .and_then(Value::as_string)
+                    .unwrap_or_else(|| format!("proxies[{i}]"));
                 d.error(Kind::Invalid, proxy_loc(&name), None, e);
             }
         }
@@ -115,13 +132,20 @@ pub fn push_unique(out: &mut Vec<Proxy>, mut p: Proxy, d: &mut Diagnostics) {
             n += 1;
         }
         p.name = format!("{base} {n}");
-        d.warn(Kind::Renamed, proxy_loc(&base), Some("name"), format!("duplicate name, renamed to {:?}", p.name));
+        d.warn(
+            Kind::Renamed,
+            proxy_loc(&base),
+            Some("name"),
+            format!("duplicate name, renamed to {:?}", p.name),
+        );
     }
     out.push(p);
 }
 
 fn s(m: &mut Map, k: &str) -> Option<String> {
-    take(m, k).and_then(|v| v.as_string()).filter(|s| !s.is_empty())
+    take(m, k)
+        .and_then(|v| v.as_string())
+        .filter(|s| !s.is_empty())
 }
 fn b(m: &mut Map, k: &str) -> Option<bool> {
     take(m, k).and_then(|v| v.as_bool())
@@ -151,7 +175,9 @@ fn headers(v: Option<Value>) -> Vec<(String, String)> {
 /// Parses one proxy mapping.
 pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
     let name = s(&mut m, "name").ok_or("missing `name`")?;
-    let kind = s(&mut m, "type").ok_or("missing `type`")?.to_ascii_lowercase();
+    let kind = s(&mut m, "type")
+        .ok_or("missing `type`")?
+        .to_ascii_lowercase();
     let server = s(&mut m, "server").ok_or("missing `server`")?;
     let port_v = take(&mut m, "port");
     let port = match port_v.as_ref().and_then(Value::as_u64) {
@@ -172,9 +198,14 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
     };
 
     // TLS: implicit for these protocols.
-    let implicit_tls = matches!(kind.as_str(), "trojan" | "hysteria" | "hysteria2" | "tuic" | "anytls");
+    let implicit_tls = matches!(
+        kind.as_str(),
+        "trojan" | "hysteria" | "hysteria2" | "tuic" | "anytls"
+    );
     let tls_flag = b(&mut m, "tls").unwrap_or(false);
-    let sni = s(&mut m, "servername").or_else(|| s(&mut m, "sni")).or_else(|| s(&mut m, "peer"));
+    let sni = s(&mut m, "servername")
+        .or_else(|| s(&mut m, "sni"))
+        .or_else(|| s(&mut m, "peer"));
     let insecure = b(&mut m, "skip-cert-verify");
     let alpn = list(&mut m, "alpn");
     let utls = s(&mut m, "client-fingerprint");
@@ -182,7 +213,9 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
     let reality = match take(&mut m, "reality-opts") {
         Some(Value::Map(mut r)) => Some(Reality {
             public_key: s(&mut r, "public-key").unwrap_or_default(),
-            short_id: take(&mut r, "short-id").and_then(|v| v.as_string()).unwrap_or_default(),
+            short_id: take(&mut r, "short-id")
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
         }),
         _ => None,
     };
@@ -194,7 +227,11 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
         _ => None,
     };
     let client_cert = s(&mut m, "certificate");
-    let client_key = if kind != "wireguard" && kind != "ssh" { s(&mut m, "private-key") } else { None };
+    let client_key = if kind != "wireguard" && kind != "ssh" {
+        s(&mut m, "private-key")
+    } else {
+        None
+    };
     let tls_enabled = implicit_tls || tls_flag || reality.is_some();
     let tls = if tls_enabled || sni.is_some() || insecure.is_some() || !alpn.is_empty() {
         Some(Tls {
@@ -265,7 +302,9 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
         },
         "vmess" => Protocol::Vmess {
             uuid: s(&mut m, "uuid").ok_or("missing `uuid`")?,
-            alter_id: n(&mut m, "alterId").or_else(|| n(&mut m, "alter-id")).unwrap_or(0) as u32,
+            alter_id: n(&mut m, "alterId")
+                .or_else(|| n(&mut m, "alter-id"))
+                .unwrap_or(0) as u32,
             security: s(&mut m, "cipher").unwrap_or_else(|| "auto".into()),
             global_padding: b(&mut m, "global-padding"),
             authenticated_length: b(&mut m, "authenticated-length"),
@@ -293,7 +332,9 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
             password: s(&mut m, "password").ok_or("missing `password`")?,
         },
         "hysteria" => Protocol::Hysteria {
-            auth: s(&mut m, "auth-str").or_else(|| s(&mut m, "auth_str")).or_else(|| s(&mut m, "auth")),
+            auth: s(&mut m, "auth-str")
+                .or_else(|| s(&mut m, "auth_str"))
+                .or_else(|| s(&mut m, "auth")),
             up: s(&mut m, "up"),
             down: s(&mut m, "down"),
             obfs: s(&mut m, "obfs"),
@@ -304,7 +345,9 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
             disable_mtu_discovery: b(&mut m, "disable-mtu-discovery"),
         },
         "hysteria2" | "hy2" => Protocol::Hysteria2 {
-            password: s(&mut m, "password").or_else(|| s(&mut m, "auth")).unwrap_or_default(),
+            password: s(&mut m, "password")
+                .or_else(|| s(&mut m, "auth"))
+                .unwrap_or_default(),
             ports: s(&mut m, "ports"),
             hop_interval: n(&mut m, "hop-interval"),
             obfs: s(&mut m, "obfs"),
@@ -319,7 +362,9 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
             congestion_control: s(&mut m, "congestion-controller"),
             udp_relay_mode: s(&mut m, "udp-relay-mode"),
             zero_rtt: b(&mut m, "reduce-rtt"),
-            heartbeat: take(&mut m, "heartbeat-interval").and_then(|v| v.as_u64()).map(|ms| format!("{ms}ms")),
+            heartbeat: take(&mut m, "heartbeat-interval")
+                .and_then(|v| v.as_u64())
+                .map(|ms| format!("{ms}ms")),
         },
         "anytls" => Protocol::AnyTls {
             password: s(&mut m, "password").ok_or("missing `password`")?,
@@ -399,8 +444,15 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
             multiplexing: s(&mut m, "multiplexing"),
         },
         other => {
-            d.info(Kind::Repaired, &loc, Some("type"), format!("type `{other}` is kept as-is but not modelled"));
-            Protocol::Other { kind: other.to_string() }
+            d.info(
+                Kind::Repaired,
+                &loc,
+                Some("type"),
+                format!("type `{other}` is kept as-is but not modelled"),
+            );
+            Protocol::Other {
+                kind: other.to_string(),
+            }
         }
     };
     Ok(Proxy {
@@ -418,13 +470,18 @@ pub fn parse_proxy(mut m: Map, d: &mut Diagnostics) -> Result<Proxy, String> {
 
 fn parse_reserved(v: Option<Value>) -> Option<Vec<u8>> {
     match v? {
-        Value::Seq(s) => s.iter().map(|x| x.as_u64().and_then(|n| u8::try_from(n).ok())).collect(),
+        Value::Seq(s) => s
+            .iter()
+            .map(|x| x.as_u64().and_then(|n| u8::try_from(n).ok()))
+            .collect(),
         Value::Scalar { text, .. } => {
             if text.contains(',') {
                 text.split(',').map(|x| x.trim().parse().ok()).collect()
             } else {
                 use base64::Engine;
-                base64::engine::general_purpose::STANDARD.decode(text.trim()).ok()
+                base64::engine::general_purpose::STANDARD
+                    .decode(text.trim())
+                    .ok()
             }
         }
         _ => None,
@@ -441,10 +498,29 @@ fn parse_transport(m: &mut Map, kind: &str, loc: &str, d: &mut Diagnostics) -> O
     // legacy vmess ws keys
     let ws_path = s(m, "ws-path");
     let ws_headers = take(m, "ws-headers");
-    if matches!(kind, "ss" | "ssr" | "hysteria" | "hysteria2" | "tuic" | "wireguard" | "ssh" | "socks5" | "http" | "snell" | "mieru" | "anytls") {
+    if matches!(
+        kind,
+        "ss" | "ssr"
+            | "hysteria"
+            | "hysteria2"
+            | "tuic"
+            | "wireguard"
+            | "ssh"
+            | "socks5"
+            | "http"
+            | "snell"
+            | "mieru"
+            | "anytls"
+    ) {
         return None;
     }
-    let net = network.unwrap_or_else(|| if ws_path.is_some() { "ws".into() } else { "tcp".into() });
+    let net = network.unwrap_or_else(|| {
+        if ws_path.is_some() {
+            "ws".into()
+        } else {
+            "tcp".into()
+        }
+    });
     let opt = |v: Option<Value>| v.and_then(|v| v.as_map().cloned()).unwrap_or_default();
     match net.as_str() {
         "tcp" | "" => None,
@@ -454,11 +530,17 @@ fn parse_transport(m: &mut Map, kind: &str, loc: &str, d: &mut Diagnostics) -> O
             if hdrs.is_empty() {
                 hdrs = headers(ws_headers);
             }
-            let host_pos = hdrs.iter().position(|(k, _)| k.eq_ignore_ascii_case("host"));
+            let host_pos = hdrs
+                .iter()
+                .position(|(k, _)| k.eq_ignore_ascii_case("host"));
             let host = host_pos.map(|i| hdrs.remove(i).1);
             let path = s(&mut o, "path").or(ws_path).unwrap_or_else(|| "/".into());
             if b(&mut o, "v2ray-http-upgrade") == Some(true) {
-                return Some(Transport::HttpUpgrade { path, host, headers: hdrs });
+                return Some(Transport::HttpUpgrade {
+                    path,
+                    host,
+                    headers: hdrs,
+                });
             }
             Some(Transport::Ws {
                 path,
@@ -471,7 +553,9 @@ fn parse_transport(m: &mut Map, kind: &str, loc: &str, d: &mut Diagnostics) -> O
         "httpupgrade" => {
             let mut o = opt(ws);
             let mut hdrs = headers(take(&mut o, "headers"));
-            let host_pos = hdrs.iter().position(|(k, _)| k.eq_ignore_ascii_case("host"));
+            let host_pos = hdrs
+                .iter()
+                .position(|(k, _)| k.eq_ignore_ascii_case("host"));
             let host = host_pos.map(|i| hdrs.remove(i).1);
             Some(Transport::HttpUpgrade {
                 path: s(&mut o, "path").unwrap_or_else(|| "/".into()),
@@ -524,7 +608,12 @@ fn parse_transport(m: &mut Map, kind: &str, loc: &str, d: &mut Diagnostics) -> O
         }
         "quic" => Some(Transport::Quic),
         other => {
-            d.warn(Kind::FieldDropped, loc, Some("network"), format!("unknown network `{other}`, treated as tcp"));
+            d.warn(
+                Kind::FieldDropped,
+                loc,
+                Some("network"),
+                format!("unknown network `{other}`, treated as tcp"),
+            );
             None
         }
     }
@@ -645,7 +734,12 @@ fn parse_rules(v: &Value, d: &mut Diagnostics, section: &str) -> Vec<Rule> {
     let mut out = Vec::new();
     for (i, r) in v.as_seq().cloned().unwrap_or_default().iter().enumerate() {
         let Some(text) = r.as_text() else {
-            d.error(Kind::Invalid, format!("{section}[{i}]"), None, "rule is not a string");
+            d.error(
+                Kind::Invalid,
+                format!("{section}[{i}]"),
+                None,
+                "rule is not a string",
+            );
             continue;
         };
         match parse_rule(text) {
@@ -695,11 +789,16 @@ pub fn parse_rule(text: &str) -> Result<Rule, String> {
             Matcher::SubRule(Box::new(m), target.clone())
         } else {
             let items = split_groups(inner)?;
-            let subs = items.iter().map(|s| parse_matcher(s)).collect::<Result<Vec<_>, _>>()?;
+            let subs = items
+                .iter()
+                .map(|s| parse_matcher(s))
+                .collect::<Result<Vec<_>, _>>()?;
             match ty.as_str() {
                 "AND" => Matcher::And(subs),
                 "OR" => Matcher::Or(subs),
-                _ => Matcher::Not(Box::new(subs.into_iter().next().ok_or("NOT needs one condition")?)),
+                _ => Matcher::Not(Box::new(
+                    subs.into_iter().next().ok_or("NOT needs one condition")?,
+                )),
             }
         };
         return Ok(Rule {
@@ -739,18 +838,28 @@ pub fn parse_rule(text: &str) -> Result<Rule, String> {
 
 fn parse_matcher(s: &str) -> Result<Matcher, String> {
     let s = s.trim();
-    let s = s.strip_prefix('(').and_then(|x| x.strip_suffix(')')).unwrap_or(s);
-    let (ty, rest) = s.split_once(',').ok_or_else(|| format!("bad condition `{s}`"))?;
+    let s = s
+        .strip_prefix('(')
+        .and_then(|x| x.strip_suffix(')'))
+        .unwrap_or(s);
+    let (ty, rest) = s
+        .split_once(',')
+        .ok_or_else(|| format!("bad condition `{s}`"))?;
     let ty = ty.trim().to_ascii_uppercase();
     if matches!(ty.as_str(), "AND" | "OR" | "NOT") {
         let rest = rest.trim();
         let end = matching_paren(rest).ok_or("unbalanced parentheses")?;
         let items = split_groups(&rest[1..end])?;
-        let subs = items.iter().map(|x| parse_matcher(x)).collect::<Result<Vec<_>, _>>()?;
+        let subs = items
+            .iter()
+            .map(|x| parse_matcher(x))
+            .collect::<Result<Vec<_>, _>>()?;
         return Ok(match ty.as_str() {
             "AND" => Matcher::And(subs),
             "OR" => Matcher::Or(subs),
-            _ => Matcher::Not(Box::new(subs.into_iter().next().ok_or("NOT needs one condition")?)),
+            _ => Matcher::Not(Box::new(
+                subs.into_iter().next().ok_or("NOT needs one condition")?,
+            )),
         });
     }
     // conditions can carry `no-resolve`; drop it
@@ -857,9 +966,13 @@ mod tests {
         let r = parse_rule("AND,((DOMAIN-SUFFIX,example.org),(NETWORK,UDP)),REJECT").unwrap();
         assert_eq!(
             r.matcher,
-            Matcher::And(vec![Matcher::DomainSuffix("example.org".into()), Matcher::Network("UDP".into())])
+            Matcher::And(vec![
+                Matcher::DomainSuffix("example.org".into()),
+                Matcher::Network("UDP".into())
+            ])
         );
-        let r = parse_rule("OR,((AND,((DST-PORT,443),(NETWORK,UDP))),(DOMAIN,a.com)),REJECT").unwrap();
+        let r =
+            parse_rule("OR,((AND,((DST-PORT,443),(NETWORK,UDP))),(DOMAIN,a.com)),REJECT").unwrap();
         assert!(matches!(r.matcher, Matcher::Or(ref v) if matches!(v[0], Matcher::And(_))));
         assert!(parse_rule("DOMAIN,a.com").is_err());
     }

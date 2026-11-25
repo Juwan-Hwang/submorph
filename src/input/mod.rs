@@ -64,14 +64,24 @@ fn err(message: impl Into<String>) -> ParseError {
 /// Parses raw bytes. Invalid UTF-8 is replaced (and reported) rather than rejected.
 pub fn parse_bytes(input: &[u8], opts: &ParseOptions) -> Result<(Config, Diagnostics), ParseError> {
     if input.len() > opts.max_bytes {
-        return Err(err(format!("input is {} bytes, over the {} byte limit", input.len(), opts.max_bytes)));
+        return Err(err(format!(
+            "input is {} bytes, over the {} byte limit",
+            input.len(),
+            opts.max_bytes
+        )));
     }
     // UTF-16 with BOM (some Windows tools save this way)
     if input.len() >= 2 && (input[..2] == [0xFF, 0xFE] || input[..2] == [0xFE, 0xFF]) {
         let le = input[0] == 0xFF;
         let units: Vec<u16> = input[2..]
             .chunks_exact(2)
-            .map(|c| if le { u16::from_le_bytes([c[0], c[1]]) } else { u16::from_be_bytes([c[0], c[1]]) })
+            .map(|c| {
+                if le {
+                    u16::from_le_bytes([c[0], c[1]])
+                } else {
+                    u16::from_be_bytes([c[0], c[1]])
+                }
+            })
             .collect();
         let s = String::from_utf16_lossy(&units);
         let (c, mut d) = parse(&s, opts)?;
@@ -87,7 +97,10 @@ pub fn parse_bytes(input: &[u8], opts: &ParseOptions) -> Result<(Config, Diagnos
                 Kind::Repaired,
                 "input",
                 None,
-                format!("invalid UTF-8 at byte {}; bad bytes were replaced with U+FFFD", e.valid_up_to()),
+                format!(
+                    "invalid UTF-8 at byte {}; bad bytes were replaced with U+FFFD",
+                    e.valid_up_to()
+                ),
             );
             Ok((c, d))
         }
@@ -97,7 +110,11 @@ pub fn parse_bytes(input: &[u8], opts: &ParseOptions) -> Result<(Config, Diagnos
 /// Parses a subscription body of any supported format.
 pub fn parse(input: &str, opts: &ParseOptions) -> Result<(Config, Diagnostics), ParseError> {
     if input.len() > opts.max_bytes {
-        return Err(err(format!("input is {} bytes, over the {} byte limit", input.len(), opts.max_bytes)));
+        return Err(err(format!(
+            "input is {} bytes, over the {} byte limit",
+            input.len(),
+            opts.max_bytes
+        )));
     }
     let mut d = Diagnostics::default();
     let cfg = parse_inner(input, opts, &mut d, 0)?;
@@ -109,7 +126,12 @@ pub fn parse(input: &str, opts: &ParseOptions) -> Result<(Config, Diagnostics), 
     Ok((cfg, d))
 }
 
-fn parse_inner(input: &str, opts: &ParseOptions, d: &mut Diagnostics, depth: usize) -> Result<Config, ParseError> {
+fn parse_inner(
+    input: &str,
+    opts: &ParseOptions,
+    d: &mut Diagnostics,
+    depth: usize,
+) -> Result<Config, ParseError> {
     let text = input.trim_start_matches('\u{feff}');
     if text.len() != input.len() {
         d.info(Kind::Repaired, "input", None, "removed a byte-order mark");
@@ -118,8 +140,16 @@ fn parse_inner(input: &str, opts: &ParseOptions, d: &mut Diagnostics, depth: usi
     if trimmed.is_empty() {
         return Err(err("the input is empty"));
     }
-    let head: String = trimmed.chars().take(64).collect::<String>().to_ascii_lowercase();
-    if head.starts_with("<!doctype") || head.starts_with("<html") || head.starts_with("<?xml") || head.starts_with("<head") {
+    let head: String = trimmed
+        .chars()
+        .take(64)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if head.starts_with("<!doctype")
+        || head.starts_with("<html")
+        || head.starts_with("<?xml")
+        || head.starts_with("<head")
+    {
         return Err(err(
             "the input is an HTML/XML page, not a subscription (the server may have returned a login, error or block page)",
         ));
@@ -135,16 +165,32 @@ fn parse_inner(input: &str, opts: &ParseOptions, d: &mut Diagnostics, depth: usi
             }
             Err(e) if looks_like_json(trimmed) => {
                 // Might still be YAML flow syntax; fall through, but remember the error.
-                d.info(Kind::Repaired, "input", None, format!("not strict JSON ({e}); trying YAML"));
+                d.info(
+                    Kind::Repaired,
+                    "input",
+                    None,
+                    format!("not strict JSON ({e}); trying YAML"),
+                );
             }
             Err(_) => {}
         }
     }
 
     // Share links (one per line, possibly mixed with junk lines)
-    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-    let link_lines = lines.iter().filter(|l| links::link_scheme(l).is_some()).count();
-    let yaml_proxies = text.lines().any(|l| l.starts_with("proxies:") || l.starts_with("proxy-groups:") || l.starts_with("proxy-providers:"));
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    let link_lines = lines
+        .iter()
+        .filter(|l| links::link_scheme(l).is_some())
+        .count();
+    let yaml_proxies = text.lines().any(|l| {
+        l.starts_with("proxies:")
+            || l.starts_with("proxy-groups:")
+            || l.starts_with("proxy-providers:")
+    });
     if link_lines > 0 && !yaml_proxies {
         return Ok(parse_link_lines(&lines, d));
     }
@@ -169,7 +215,13 @@ fn parse_inner(input: &str, opts: &ParseOptions, d: &mut Diagnostics, depth: usi
         && let Some(bytes) = links::b64_decode(trimmed)
     {
         let inner = String::from_utf8_lossy(&bytes).into_owned();
-        if inner.chars().filter(|c| c.is_control() && !c.is_whitespace()).count() * 10 < inner.len().max(1) {
+        if inner
+            .chars()
+            .filter(|c| c.is_control() && !c.is_whitespace())
+            .count()
+            * 10
+            < inner.len().max(1)
+        {
             return parse_inner(&inner, opts, d, depth + 1);
         }
     }
@@ -177,9 +229,17 @@ fn parse_inner(input: &str, opts: &ParseOptions, d: &mut Diagnostics, depth: usi
     if let Some(e) = yaml_err
         && (text.contains("proxies") || text.contains(": "))
     {
-        return Err(err(format!("the input looks like YAML but cannot be parsed: {e}")));
+        return Err(err(format!(
+            "the input looks like YAML but cannot be parsed: {e}"
+        )));
     }
-    let first: String = trimmed.lines().next().unwrap_or("").chars().take(60).collect();
+    let first: String = trimmed
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(60)
+        .collect();
     Err(err(format!(
         "unrecognised format: not a Clash/Mihomo config, sing-box config, share-link list or Base64 subscription (first line: {first:?})"
     )))
@@ -191,21 +251,33 @@ fn looks_like_json(s: &str) -> bool {
 
 fn looks_base64(s: &str) -> bool {
     s.len() >= 8
-        && s
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'=' | b'-' | b'_' | b'\r' | b'\n' | b' ' | b'\t'))
+        && s.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || matches!(
+                    b,
+                    b'+' | b'/' | b'=' | b'-' | b'_' | b'\r' | b'\n' | b' ' | b'\t'
+                )
+        })
 }
 
 fn is_clash_doc(v: &Value) -> bool {
     match v {
-        Value::Map(m) => m.iter().any(|(k, _)| matches!(k.as_str(), "proxies" | "proxy-groups" | "proxy-providers")),
-        Value::Seq(s) => !s.is_empty() && s.iter().all(|x| x.get("type").is_some() && x.get("server").is_some()),
+        Value::Map(m) => m
+            .iter()
+            .any(|(k, _)| matches!(k.as_str(), "proxies" | "proxy-groups" | "proxy-providers")),
+        Value::Seq(s) => {
+            !s.is_empty()
+                && s.iter()
+                    .all(|x| x.get("type").is_some() && x.get("server").is_some())
+        }
         _ => false,
     }
 }
 
 fn from_json(j: serde_json::Value, d: &mut Diagnostics) -> Option<Config> {
-    let is_singbox = |o: &serde_json::Map<String, serde_json::Value>| o.contains_key("outbounds") || o.contains_key("endpoints");
+    let is_singbox = |o: &serde_json::Map<String, serde_json::Value>| {
+        o.contains_key("outbounds") || o.contains_key("endpoints")
+    };
     match &j {
         serde_json::Value::Object(o) if is_singbox(o) => Some(singbox::from_json(&j, d)),
         serde_json::Value::Array(a) if a.iter().any(|x| x.get("server_port").is_some()) => {
@@ -233,7 +305,12 @@ fn parse_link_lines(lines: &[&str], d: &mut Diagnostics) -> Config {
         if links::link_scheme(line).is_none() {
             if !line.starts_with('#') && !line.starts_with("//") {
                 let preview: String = line.chars().take(40).collect();
-                d.info(Kind::Invalid, loc, None, format!("skipped a line that is not a share link: {preview:?}"));
+                d.info(
+                    Kind::Invalid,
+                    loc,
+                    None,
+                    format!("skipped a line that is not a share link: {preview:?}"),
+                );
             }
             continue;
         }
@@ -264,11 +341,17 @@ mod tests {
         assert_eq!(parse(&b64, &o).unwrap().0.proxies.len(), 1);
         let y = "proxies:\n  - {name: a, type: trojan, server: s, port: 1, password: p}\n";
         assert_eq!(parse(y, &o).unwrap().0.source, SourceFormat::ClashYaml);
-        let j = r#"{"proxies":[{"name":"a","type":"trojan","server":"s","port":1,"password":"p"}]}"#;
+        let j =
+            r#"{"proxies":[{"name":"a","type":"trojan","server":"s","port":1,"password":"p"}]}"#;
         assert_eq!(parse(j, &o).unwrap().0.source, SourceFormat::ClashJson);
         let sb = r#"{"outbounds":[{"type":"trojan","tag":"a","server":"s","server_port":1,"password":"p"}]}"#;
         assert_eq!(parse(sb, &o).unwrap().0.source, SourceFormat::SingBox);
-        assert!(parse("<html><body>login</body></html>", &o).unwrap_err().message.contains("HTML"));
+        assert!(
+            parse("<html><body>login</body></html>", &o)
+                .unwrap_err()
+                .message
+                .contains("HTML")
+        );
         assert!(parse("   ", &o).unwrap_err().message.contains("empty"));
     }
 

@@ -57,9 +57,14 @@ fn run() -> Result<ExitCode, String> {
                 let v = val(&a)?;
                 let (name, file) = v.split_once('=').ok_or("--provider expects NAME=FILE")?;
                 let text = std::fs::read(file).map_err(|e| format!("{file}: {e}"))?;
-                opts.provider_contents.push((name.to_string(), String::from_utf8_lossy(&text).into_owned()));
+                opts.provider_contents.push((
+                    name.to_string(),
+                    String::from_utf8_lossy(&text).into_owned(),
+                ));
             }
-            s if s.starts_with('-') && s != "-" => return Err(format!("unknown option {s}\n\n{USAGE}")),
+            s if s.starts_with('-') && s != "-" => {
+                return Err(format!("unknown option {s}\n\n{USAGE}"));
+            }
             _ if input.is_none() => input = Some(a),
             _ => return Err("only one INPUT is accepted".into()),
         }
@@ -68,7 +73,9 @@ fn run() -> Result<ExitCode, String> {
     let bytes = match input.as_deref() {
         None | Some("-") => {
             let mut b = Vec::new();
-            std::io::stdin().read_to_end(&mut b).map_err(|e| e.to_string())?;
+            std::io::stdin()
+                .read_to_end(&mut b)
+                .map_err(|e| e.to_string())?;
             b
         }
         Some(path) => std::fs::read(path).map_err(|e| format!("{path}: {e}"))?,
@@ -76,7 +83,9 @@ fn run() -> Result<ExitCode, String> {
     let res = submorph::convert_bytes(&bytes, &target, &opts).map_err(|e| e.to_string())?;
     match output {
         Some(path) => std::fs::write(&path, &res.output).map_err(|e| format!("{path}: {e}"))?,
-        None => std::io::stdout().write_all(res.output.as_bytes()).map_err(|e| e.to_string())?,
+        None => std::io::stdout()
+            .write_all(res.output.as_bytes())
+            .map_err(|e| e.to_string())?,
     }
     match diag_fmt.as_str() {
         "none" => {}
@@ -90,6 +99,14 @@ fn run() -> Result<ExitCode, String> {
             }
         }
     }
-    let dropped = res.diagnostics.items.iter().any(|d| d.severity == submorph::Severity::Error);
-    Ok(if strict && dropped { ExitCode::from(2) } else { ExitCode::SUCCESS })
+    let dropped = res
+        .diagnostics
+        .items
+        .iter()
+        .any(|d| d.severity == submorph::Severity::Error);
+    Ok(if strict && dropped {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
+    })
 }

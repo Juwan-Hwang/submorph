@@ -16,11 +16,21 @@ fn bo(o: &J, k: &str) -> Option<bool> {
     o.get(k).and_then(J::as_bool)
 }
 fn nu(o: &J, k: &str) -> Option<u64> {
-    o.get(k).and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+    o.get(k).and_then(|v| {
+        v.as_u64()
+            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    })
 }
 fn strs(o: &J, k: &str) -> Vec<String> {
     match o.get(k) {
-        Some(J::Array(a)) => a.iter().filter_map(|x| x.as_str().map(str::to_string).or_else(|| x.as_u64().map(|n| n.to_string()))).collect(),
+        Some(J::Array(a)) => a
+            .iter()
+            .filter_map(|x| {
+                x.as_str()
+                    .map(str::to_string)
+                    .or_else(|| x.as_u64().map(|n| n.to_string()))
+            })
+            .collect(),
         Some(J::String(s)) => vec![s.clone()],
         Some(J::Number(n)) => vec![n.to_string()],
         _ => Vec::new(),
@@ -46,10 +56,21 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
         source: SourceFormat::SingBox,
         ..Default::default()
     };
-    let outs: Vec<J> = j.get("outbounds").and_then(J::as_array).cloned().unwrap_or_default();
-    let eps: Vec<J> = j.get("endpoints").and_then(J::as_array).cloned().unwrap_or_default();
+    let outs: Vec<J> = j
+        .get("outbounds")
+        .and_then(J::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let eps: Vec<J> = j
+        .get("endpoints")
+        .and_then(J::as_array)
+        .cloned()
+        .unwrap_or_default();
     // shadowtls outbounds wrap shadowsocks via `detour`
-    let shadowtls: Vec<&J> = outs.iter().filter(|o| st(o, "type").as_deref() == Some("shadowtls")).collect();
+    let shadowtls: Vec<&J> = outs
+        .iter()
+        .filter(|o| st(o, "type").as_deref() == Some("shadowtls"))
+        .collect();
     let mut block_tags = Vec::new();
     let mut direct_tags = Vec::new();
     for o in outs.iter().chain(eps.iter()) {
@@ -66,7 +87,11 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
                 }
                 cfg.groups.push(Group {
                     name: tag,
-                    kind: if ty == "selector" { GroupKind::Select } else { GroupKind::UrlTest },
+                    kind: if ty == "selector" {
+                        GroupKind::Select
+                    } else {
+                        GroupKind::UrlTest
+                    },
                     members,
                     use_providers: Vec::new(),
                     url: st(o, "url"),
@@ -114,10 +139,22 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
         }
     };
     if let Some(route) = j.get("route") {
-        for rs in route.get("rule_set").and_then(J::as_array).cloned().unwrap_or_default() {
+        for rs in route
+            .get("rule_set")
+            .and_then(J::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
             cfg.rule_providers.push(rule_set(&rs));
         }
-        for (i, r) in route.get("rules").and_then(J::as_array).cloned().unwrap_or_default().iter().enumerate() {
+        for (i, r) in route
+            .get("rules")
+            .and_then(J::as_array)
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+        {
             let action = st(r, "action").unwrap_or_else(|| "route".into());
             let target = match action.as_str() {
                 "route" => match st(r, "outbound") {
@@ -134,7 +171,8 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
                 // sniff / resolve / hijack-dns / route-options have no Clash rule equivalent
                 _ => continue,
             };
-            if r.get("protocol").and_then(J::as_str) == Some("dns") || r.get("clash_mode").is_some() {
+            if r.get("protocol").and_then(J::as_str) == Some("dns") || r.get("clash_mode").is_some()
+            {
                 continue;
             }
             match rule_to_matchers(r) {
@@ -149,7 +187,12 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
                         });
                     }
                 }
-                None => d.warn(Kind::Unsupported, format!("route.rules[{i}]"), None, "rule has no field that converts"),
+                None => d.warn(
+                    Kind::Unsupported,
+                    format!("route.rules[{i}]"),
+                    None,
+                    "rule has no field that converts",
+                ),
             }
         }
         if let Some(f) = st(route, "final") {
@@ -165,7 +208,12 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
     if let Some(dns) = j.get("dns") {
         cfg.dns = Some(parse_dns(dns));
     }
-    for ib in j.get("inbounds").and_then(J::as_array).cloned().unwrap_or_default() {
+    for ib in j
+        .get("inbounds")
+        .and_then(J::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
         match st(&ib, "type").as_deref() {
             Some("mixed") => cfg.general.mixed_port = nu(&ib, "listen_port").map(|p| p as u16),
             Some("http") => cfg.general.http_port = nu(&ib, "listen_port").map(|p| p as u16),
@@ -188,7 +236,9 @@ pub fn from_json(j: &J, d: &mut Diagnostics) -> Config {
             }
             _ => {}
         }
-        if bo(&ib, "listen").is_none() && st(&ib, "listen").is_some_and(|l| l == "0.0.0.0" || l == "::") {
+        if bo(&ib, "listen").is_none()
+            && st(&ib, "listen").is_some_and(|l| l == "0.0.0.0" || l == "::")
+        {
             cfg.general.allow_lan = Some(true);
         }
     }
@@ -208,24 +258,37 @@ fn tls_of(o: &J) -> Option<Tls> {
     if bo(t, "enabled") != Some(true) {
         return None;
     }
-    let reality = t.get("reality").filter(|r| bo(r, "enabled") == Some(true)).map(|r| Reality {
-        public_key: st(r, "public_key").unwrap_or_default(),
-        short_id: st(r, "short_id").unwrap_or_default(),
-    });
-    let ech = t.get("ech").filter(|e| bo(e, "enabled") == Some(true)).map(|e| EchOpts {
-        enable: true,
-        config: {
-            let lines = strs(e, "config");
-            let body: String = lines.iter().filter(|l| !l.starts_with("-----")).cloned().collect();
-            if body.is_empty() { None } else { Some(body) }
-        },
-    });
+    let reality = t
+        .get("reality")
+        .filter(|r| bo(r, "enabled") == Some(true))
+        .map(|r| Reality {
+            public_key: st(r, "public_key").unwrap_or_default(),
+            short_id: st(r, "short_id").unwrap_or_default(),
+        });
+    let ech = t
+        .get("ech")
+        .filter(|e| bo(e, "enabled") == Some(true))
+        .map(|e| EchOpts {
+            enable: true,
+            config: {
+                let lines = strs(e, "config");
+                let body: String = lines
+                    .iter()
+                    .filter(|l| !l.starts_with("-----"))
+                    .cloned()
+                    .collect();
+                if body.is_empty() { None } else { Some(body) }
+            },
+        });
     Some(Tls {
         enabled: true,
         sni: st(t, "server_name"),
         insecure: bo(t, "insecure"),
         alpn: strs(t, "alpn"),
-        utls: t.get("utls").filter(|u| bo(u, "enabled") == Some(true)).map(|u| st(u, "fingerprint").unwrap_or_else(|| "chrome".into())),
+        utls: t
+            .get("utls")
+            .filter(|u| bo(u, "enabled") == Some(true))
+            .map(|u| st(u, "fingerprint").unwrap_or_else(|| "chrome".into())),
         cert_fingerprint: None,
         reality,
         ech,
@@ -241,7 +304,12 @@ fn transport_of(o: &J) -> Option<Transport> {
         let mut out = Vec::new();
         if let Some(J::Object(h)) = t.get("headers") {
             for (k, v) in h {
-                let v = v.as_str().map(str::to_string).or_else(|| v.as_array().and_then(|a| a.first()).and_then(|x| x.as_str()).map(str::to_string));
+                let v = v.as_str().map(str::to_string).or_else(|| {
+                    v.as_array()
+                        .and_then(|a| a.first())
+                        .and_then(|x| x.as_str())
+                        .map(str::to_string)
+                });
                 if let Some(v) = v {
                     if k.eq_ignore_ascii_case("host") {
                         host = Some(v);
@@ -277,7 +345,12 @@ fn transport_of(o: &J) -> Option<Transport> {
         }),
         "http" => {
             let hosts = strs(t, "host");
-            if st(t, "method").is_some() || o.get("tls").and_then(|x| x.get("enabled")).and_then(J::as_bool) != Some(true) {
+            if st(t, "method").is_some()
+                || o.get("tls")
+                    .and_then(|x| x.get("enabled"))
+                    .and_then(J::as_bool)
+                    != Some(true)
+            {
                 Some(Transport::Http {
                     method: st(t, "method"),
                     paths: strs(t, "path"),
@@ -305,7 +378,8 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
             let mut plugin = match st(o, "plugin").as_deref() {
                 Some("obfs-local") => {
                     let opts = st(o, "plugin_opts").unwrap_or_default();
-                    let kv: Vec<(&str, &str)> = opts.split(';').filter_map(|p| p.split_once('=')).collect();
+                    let kv: Vec<(&str, &str)> =
+                        opts.split(';').filter_map(|p| p.split_once('=')).collect();
                     let g = |k: &str| kv.iter().find(|(a, _)| *a == k).map(|(_, b)| b.to_string());
                     Some(SsPlugin::Obfs {
                         mode: g("obfs").unwrap_or_else(|| "http".into()),
@@ -315,7 +389,11 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
                 Some("v2ray-plugin") => {
                     let opts = st(o, "plugin_opts").unwrap_or_default();
                     let parts: Vec<&str> = opts.split(';').collect();
-                    let g = |k: &str| parts.iter().find_map(|p| p.strip_prefix(&format!("{k}=")).map(str::to_string));
+                    let g = |k: &str| {
+                        parts
+                            .iter()
+                            .find_map(|p| p.strip_prefix(&format!("{k}=")).map(str::to_string))
+                    };
                     Some(SsPlugin::V2ray {
                         mode: g("mode").unwrap_or_else(|| "websocket".into()),
                         tls: parts.contains(&"tls"),
@@ -328,12 +406,17 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
                 _ => None,
             };
             if let Some(det) = st(o, "detour")
-                && let Some(stls) = shadowtls.iter().find(|s| st(s, "tag").as_deref() == Some(det.as_str()))
+                && let Some(stls) = shadowtls
+                    .iter()
+                    .find(|s| st(s, "tag").as_deref() == Some(det.as_str()))
             {
                 server = st(stls, "server").unwrap_or(server);
                 port = nu(stls, "server_port").map(|p| p as u16).unwrap_or(port);
                 plugin = Some(SsPlugin::ShadowTls {
-                    host: stls.get("tls").and_then(|t| st(t, "server_name")).unwrap_or_default(),
+                    host: stls
+                        .get("tls")
+                        .and_then(|t| st(t, "server_name"))
+                        .unwrap_or_default(),
                     password: st(stls, "password"),
                     version: nu(stls, "version").unwrap_or(1) as u8,
                 });
@@ -343,8 +426,14 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
                 cipher: st(o, "method").ok_or("missing `method`")?,
                 password: st(o, "password").unwrap_or_default(),
                 plugin,
-                udp_over_tcp: o.get("udp_over_tcp").map(|u| u.as_bool().unwrap_or_else(|| bo(u, "enabled").unwrap_or(false))),
-                udp_over_tcp_version: o.get("udp_over_tcp").and_then(|u| nu(u, "version")).map(|v| v as u8),
+                udp_over_tcp: o.get("udp_over_tcp").map(|u| {
+                    u.as_bool()
+                        .unwrap_or_else(|| bo(u, "enabled").unwrap_or(false))
+                }),
+                udp_over_tcp_version: o
+                    .get("udp_over_tcp")
+                    .and_then(|u| nu(u, "version"))
+                    .map(|v| v as u8),
             }
         }
         "vmess" => Protocol::Vmess {
@@ -376,10 +465,17 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
             disable_mtu_discovery: bo(o, "disable_mtu_discovery"),
         },
         "hysteria2" => {
-            let ports = strs(o, "server_ports").iter().map(|p| p.replace(':', "-")).collect::<Vec<_>>();
+            let ports = strs(o, "server_ports")
+                .iter()
+                .map(|p| p.replace(':', "-"))
+                .collect::<Vec<_>>();
             Protocol::Hysteria2 {
                 password: st(o, "password").unwrap_or_default(),
-                ports: if ports.is_empty() { None } else { Some(ports.join(",")) },
+                ports: if ports.is_empty() {
+                    None
+                } else {
+                    Some(ports.join(","))
+                },
                 hop_interval: secs(o, "hop_interval"),
                 obfs: o.get("obfs").and_then(|x| st(x, "type")),
                 obfs_password: o.get("obfs").and_then(|x| st(x, "password")),
@@ -403,24 +499,43 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
             min_idle_session: nu(o, "min_idle_session"),
         },
         "wireguard" => {
-            let peer = o.get("peers").and_then(J::as_array).and_then(|a| a.first()).cloned().unwrap_or_else(|| o.clone());
+            let peer = o
+                .get("peers")
+                .and_then(J::as_array)
+                .and_then(|a| a.first())
+                .cloned()
+                .unwrap_or_else(|| o.clone());
             if server.is_empty() {
-                server = st(&peer, "address").or_else(|| st(&peer, "server")).unwrap_or_default();
-                port = nu(&peer, "port").or_else(|| nu(&peer, "server_port")).unwrap_or(0) as u16;
+                server = st(&peer, "address")
+                    .or_else(|| st(&peer, "server"))
+                    .unwrap_or_default();
+                port = nu(&peer, "port")
+                    .or_else(|| nu(&peer, "server_port"))
+                    .unwrap_or(0) as u16;
             }
             let addrs = {
                 let a = strs(o, "address");
-                if a.is_empty() { strs(o, "local_address") } else { a }
+                if a.is_empty() {
+                    strs(o, "local_address")
+                } else {
+                    a
+                }
             };
             let strip = |a: &String| a.split('/').next().unwrap_or(a).to_string();
             Protocol::WireGuard(WireGuard {
                 private_key: st(o, "private_key").ok_or("missing `private_key`")?,
-                public_key: st(&peer, "public_key").or_else(|| st(o, "peer_public_key")).ok_or("missing peer `public_key`")?,
+                public_key: st(&peer, "public_key")
+                    .or_else(|| st(o, "peer_public_key"))
+                    .ok_or("missing peer `public_key`")?,
                 pre_shared_key: st(&peer, "pre_shared_key"),
                 ip: addrs.iter().find(|a| !a.contains(':')).map(strip),
                 ipv6: addrs.iter().find(|a| a.contains(':')).map(strip),
                 allowed_ips: strs(&peer, "allowed_ips"),
-                reserved: peer.get("reserved").and_then(J::as_array).map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect()),
+                reserved: peer.get("reserved").and_then(J::as_array).map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_u64().map(|n| n as u8))
+                        .collect()
+                }),
                 mtu: nu(o, "mtu").map(|v| v as u32),
                 keepalive: nu(&peer, "persistent_keepalive_interval").map(|v| v as u32),
                 extra_peers: Vec::new(),
@@ -431,7 +546,11 @@ fn outbound(o: &J, ty: &str, tag: &str, shadowtls: &[&J]) -> Result<Proxy, Strin
             password: st(o, "password"),
             private_key: {
                 let k = strs(o, "private_key");
-                if k.is_empty() { None } else { Some(k.join("\n")) }
+                if k.is_empty() {
+                    None
+                } else {
+                    Some(k.join("\n"))
+                }
             },
             private_key_passphrase: st(o, "private_key_passphrase"),
             host_key: strs(o, "host_key"),
@@ -487,7 +606,12 @@ fn rule_set(rs: &J) -> RuleProvider {
     let mut payload = Vec::new();
     let mut behavior = "classical".to_string();
     if kind == "inline" {
-        for r in rs.get("rules").and_then(J::as_array).cloned().unwrap_or_default() {
+        for r in rs
+            .get("rules")
+            .and_then(J::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
             for m in rule_to_matchers(&r).unwrap_or_default() {
                 if let Some(line) = crate::output::mihomo::matcher_text(&m) {
                     payload.push(line);
@@ -511,7 +635,13 @@ fn rule_set(rs: &J) -> RuleProvider {
             _ => "inline".into(),
         },
         behavior,
-        format: st(rs, "format").map(|f| if f == "binary" { "srs".into() } else { "sing-box-json".into() }),
+        format: st(rs, "format").map(|f| {
+            if f == "binary" {
+                "srs".into()
+            } else {
+                "sing-box-json".into()
+            }
+        }),
         url,
         path: st(rs, "path"),
         interval: secs(rs, "update_interval"),
@@ -530,31 +660,61 @@ pub fn rule_to_matchers(r: &J) -> Option<Vec<Matcher>> {
             .as_array()?
             .iter()
             .filter_map(rule_to_matchers)
-            .map(|v| if v.len() == 1 { v.into_iter().next().unwrap() } else { Matcher::Or(v) })
+            .map(|v| {
+                if v.len() == 1 {
+                    v.into_iter().next().unwrap()
+                } else {
+                    Matcher::Or(v)
+                }
+            })
             .collect();
-        let m = if st(r, "mode").as_deref() == Some("or") { Matcher::Or(subs) } else { Matcher::And(subs) };
+        let m = if st(r, "mode").as_deref() == Some("or") {
+            Matcher::Or(subs)
+        } else {
+            Matcher::And(subs)
+        };
         return Some(vec![wrap_invert(r, m)]);
     }
     let mut cats: Vec<Vec<Matcher>> = Vec::new();
     let mut domain_cat: Vec<Matcher> = Vec::new();
     domain_cat.extend(strs(r, "domain").into_iter().map(Matcher::Domain));
-    domain_cat.extend(strs(r, "domain_suffix").into_iter().map(|s| Matcher::DomainSuffix(s.trim_start_matches('.').to_string())));
-    domain_cat.extend(strs(r, "domain_keyword").into_iter().map(Matcher::DomainKeyword));
-    domain_cat.extend(strs(r, "domain_regex").into_iter().map(Matcher::DomainRegex));
+    domain_cat.extend(
+        strs(r, "domain_suffix")
+            .into_iter()
+            .map(|s| Matcher::DomainSuffix(s.trim_start_matches('.').to_string())),
+    );
+    domain_cat.extend(
+        strs(r, "domain_keyword")
+            .into_iter()
+            .map(Matcher::DomainKeyword),
+    );
+    domain_cat.extend(
+        strs(r, "domain_regex")
+            .into_iter()
+            .map(Matcher::DomainRegex),
+    );
     domain_cat.extend(strs(r, "geosite").into_iter().map(Matcher::Geosite));
-    let mut ip_cat: Vec<Matcher> = strs(r, "ip_cidr").into_iter().map(Matcher::IpCidr).collect();
+    let mut ip_cat: Vec<Matcher> = strs(r, "ip_cidr")
+        .into_iter()
+        .map(Matcher::IpCidr)
+        .collect();
     ip_cat.extend(strs(r, "geoip").into_iter().map(Matcher::Geoip));
     if bo(r, "ip_is_private") == Some(true) {
         ip_cat.push(Matcher::Geoip("LAN".into()));
     }
     // sing-box merges domain and ip categories into one OR group
     domain_cat.extend(ip_cat);
-    let simple = |k: &str, f: fn(String) -> Matcher| -> Vec<Matcher> { strs(r, k).into_iter().map(f).collect() };
+    let simple = |k: &str, f: fn(String) -> Matcher| -> Vec<Matcher> {
+        strs(r, k).into_iter().map(f).collect()
+    };
     for c in [
         domain_cat,
         simple("source_ip_cidr", Matcher::SrcIpCidr),
         simple("port", Matcher::DstPort),
-        strs(r, "port_range").into_iter().map(|p| Matcher::DstPort(p.replace(':', "-"))).collect(),
+        strs(r, "port_range")
+            .into_iter()
+            .map(|p| Matcher::DstPort(p.replace(':', "-")))
+            .collect(),
         simple("source_port", Matcher::SrcPort),
         simple("process_name", Matcher::ProcessName),
         simple("process_path", Matcher::ProcessPath),
@@ -575,15 +735,32 @@ pub fn rule_to_matchers(r: &J) -> Option<Vec<Matcher>> {
     let out = if cats.len() == 1 && bo(r, "invert") != Some(true) {
         cats.pop().unwrap()
     } else {
-        let parts: Vec<Matcher> = cats.into_iter().map(|c| if c.len() == 1 { c.into_iter().next().unwrap() } else { Matcher::Or(c) }).collect();
-        let m = if parts.len() == 1 { parts.into_iter().next().unwrap() } else { Matcher::And(parts) };
+        let parts: Vec<Matcher> = cats
+            .into_iter()
+            .map(|c| {
+                if c.len() == 1 {
+                    c.into_iter().next().unwrap()
+                } else {
+                    Matcher::Or(c)
+                }
+            })
+            .collect();
+        let m = if parts.len() == 1 {
+            parts.into_iter().next().unwrap()
+        } else {
+            Matcher::And(parts)
+        };
         vec![wrap_invert(r, m)]
     };
     Some(out)
 }
 
 fn wrap_invert(r: &J, m: Matcher) -> Matcher {
-    if bo(r, "invert") == Some(true) { Matcher::Not(Box::new(m)) } else { m }
+    if bo(r, "invert") == Some(true) {
+        Matcher::Not(Box::new(m))
+    } else {
+        m
+    }
 }
 
 fn parse_dns(j: &J) -> Dns {
@@ -591,7 +768,11 @@ fn parse_dns(j: &J) -> Dns {
         enable: true,
         ..Default::default()
     };
-    let servers = j.get("servers").and_then(J::as_array).cloned().unwrap_or_default();
+    let servers = j
+        .get("servers")
+        .and_then(J::as_array)
+        .cloned()
+        .unwrap_or_default();
     let final_tag = st(j, "final");
     let mut ordered: Vec<(String, String)> = Vec::new();
     for s in &servers {
@@ -605,15 +786,32 @@ fn parse_dns(j: &J) -> Dns {
                 continue;
             }
             Some("local") => "system".to_string(),
-            Some("udp") => format!("{}{}", st(s, "server").unwrap_or_default(), nu(s, "server_port").map(|p| format!(":{p}")).unwrap_or_default()),
-            Some(t @ ("tcp" | "tls" | "quic")) => format!("{t}://{}{}", st(s, "server").unwrap_or_default(), nu(s, "server_port").map(|p| format!(":{p}")).unwrap_or_default()),
+            Some("udp") => format!(
+                "{}{}",
+                st(s, "server").unwrap_or_default(),
+                nu(s, "server_port")
+                    .map(|p| format!(":{p}"))
+                    .unwrap_or_default()
+            ),
+            Some(t @ ("tcp" | "tls" | "quic")) => format!(
+                "{t}://{}{}",
+                st(s, "server").unwrap_or_default(),
+                nu(s, "server_port")
+                    .map(|p| format!(":{p}"))
+                    .unwrap_or_default()
+            ),
             Some(t @ ("https" | "h3")) => format!(
                 "{t}://{}{}{}",
                 st(s, "server").unwrap_or_default(),
-                nu(s, "server_port").map(|p| format!(":{p}")).unwrap_or_default(),
+                nu(s, "server_port")
+                    .map(|p| format!(":{p}"))
+                    .unwrap_or_default(),
                 st(s, "path").unwrap_or_else(|| "/dns-query".into())
             ),
-            Some("dhcp") => format!("dhcp://{}", st(s, "interface").unwrap_or_else(|| "auto".into())),
+            Some("dhcp") => format!(
+                "dhcp://{}",
+                st(s, "interface").unwrap_or_else(|| "auto".into())
+            ),
             Some(_) => continue,
             // legacy format: `address` URL
             None => match st(s, "address") {
@@ -636,19 +834,36 @@ fn parse_dns(j: &J) -> Dns {
         ordered.insert(0, x);
     }
     dns.nameserver = ordered.iter().take(1).map(|(_, u)| u.clone()).collect();
-    dns.default_nameserver = ordered.iter().filter(|(_, u)| u.parse::<std::net::IpAddr>().is_ok()).map(|(_, u)| u.clone()).collect();
+    dns.default_nameserver = ordered
+        .iter()
+        .filter(|(_, u)| u.parse::<std::net::IpAddr>().is_ok())
+        .map(|(_, u)| u.clone())
+        .collect();
     // DNS rules that route domains/rule sets to a server become nameserver-policy
-    for r in j.get("rules").and_then(J::as_array).cloned().unwrap_or_default() {
-        let Some(server) = st(&r, "server") else { continue };
-        let Some((_, url)) = ordered.iter().find(|(t, _)| *t == server) else { continue };
+    for r in j
+        .get("rules")
+        .and_then(J::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
+        let Some(server) = st(&r, "server") else {
+            continue;
+        };
+        let Some((_, url)) = ordered.iter().find(|(t, _)| *t == server) else {
+            continue;
+        };
         for d in strs(&r, "domain_suffix") {
-            dns.nameserver_policy.push((format!("+.{}", d.trim_start_matches('.')), vec![url.clone()]));
+            dns.nameserver_policy.push((
+                format!("+.{}", d.trim_start_matches('.')),
+                vec![url.clone()],
+            ));
         }
         for d in strs(&r, "domain") {
             dns.nameserver_policy.push((d, vec![url.clone()]));
         }
         for rs in strs(&r, "rule_set") {
-            dns.nameserver_policy.push((format!("rule-set:{rs}"), vec![url.clone()]));
+            dns.nameserver_policy
+                .push((format!("rule-set:{rs}"), vec![url.clone()]));
         }
     }
     dns

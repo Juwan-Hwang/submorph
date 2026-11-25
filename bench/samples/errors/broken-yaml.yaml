@@ -1,0 +1,6 @@
+proxies:
+  - name: a
+    type: ss
+    server: 203.0.113.90
+   port: 8388
+  cipher: aes-256-gcm

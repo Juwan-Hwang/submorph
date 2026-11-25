@@ -9,8 +9,26 @@ use percent_encoding::percent_decode_str;
 
 /// Schemes recognised as proxy share links.
 pub const SCHEMES: &[&str] = &[
-    "ss", "ssr", "vmess", "vless", "trojan", "hysteria2", "hy2", "hysteria", "hy", "tuic", "anytls", "wireguard", "wg", "socks",
-    "socks5", "socks5h", "http", "https", "ssh", "snell",
+    "ss",
+    "ssr",
+    "vmess",
+    "vless",
+    "trojan",
+    "hysteria2",
+    "hy2",
+    "hysteria",
+    "hy",
+    "tuic",
+    "anytls",
+    "wireguard",
+    "wg",
+    "socks",
+    "socks5",
+    "socks5h",
+    "http",
+    "https",
+    "ssh",
+    "snell",
 ];
 
 /// Returns the scheme of a share-link line, if it is one we parse.
@@ -111,19 +129,30 @@ impl Url {
     }
     fn q(&self, keys: &[&str]) -> Option<String> {
         keys.iter()
-            .find_map(|k| self.query.iter().find(|(qk, _)| qk.eq_ignore_ascii_case(k)).map(|(_, v)| v.clone()))
+            .find_map(|k| {
+                self.query
+                    .iter()
+                    .find(|(qk, _)| qk.eq_ignore_ascii_case(k))
+                    .map(|(_, v)| v.clone())
+            })
             .filter(|v| !v.is_empty())
     }
     fn qb(&self, keys: &[&str]) -> Option<bool> {
-        self.q(keys).map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        self.q(keys)
+            .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
     }
     fn port_u16(&self) -> Result<u16, String> {
         let p = self.port.as_deref().ok_or("missing port")?;
         let p = p.trim_end_matches('/');
-        p.parse::<u16>().ok().filter(|&p| p > 0).ok_or_else(|| format!("invalid port `{p}`"))
+        p.parse::<u16>()
+            .ok()
+            .filter(|&p| p > 0)
+            .ok_or_else(|| format!("invalid port `{p}`"))
     }
     fn name(&self, port: u16) -> String {
-        self.fragment.clone().unwrap_or_else(|| format!("{} {}:{}", self.scheme, self.host, port))
+        self.fragment
+            .clone()
+            .unwrap_or_else(|| format!("{} {}:{}", self.scheme, self.host, port))
     }
 }
 
@@ -173,9 +202,24 @@ fn tls_from(u: &Url, enabled: bool) -> Tls {
     Tls {
         enabled,
         sni: u.q(&["sni", "peer", "servername"]),
-        insecure: u.qb(&["allowInsecure", "insecure", "allow_insecure", "skip-cert-verify"]),
-        alpn: u.q(&["alpn"]).map(|a| a.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()).unwrap_or_default(),
-        utls: u.q(&["fp", "fingerprint", "client-fingerprint"]).filter(|f| f != "none"),
+        insecure: u.qb(&[
+            "allowInsecure",
+            "insecure",
+            "allow_insecure",
+            "skip-cert-verify",
+        ]),
+        alpn: u
+            .q(&["alpn"])
+            .map(|a| {
+                a.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        utls: u
+            .q(&["fp", "fingerprint", "client-fingerprint"])
+            .filter(|f| f != "none"),
         cert_fingerprint: u.q(&["pcs", "pinSHA256"]),
         reality: None,
         ech: u.q(&["ech"]).map(|c| EchOpts {
@@ -210,7 +254,9 @@ fn transport_from(u: &Url, net: &str, d: &mut Diagnostics, name: &str) -> Option
                 host,
                 headers: Vec::new(),
                 max_early_data: ed,
-                early_data_header: u.q(&["eh"]).or_else(|| ed.map(|_| "Sec-WebSocket-Protocol".into())),
+                early_data_header: u
+                    .q(&["eh"])
+                    .or_else(|| ed.map(|_| "Sec-WebSocket-Protocol".into())),
             })
         }
         "httpupgrade" => Some(Transport::HttpUpgrade {
@@ -222,7 +268,9 @@ fn transport_from(u: &Url, net: &str, d: &mut Diagnostics, name: &str) -> Option
             service_name: u.q(&["serviceName", "service_name"]).unwrap_or_default(),
         }),
         "h2" | "http" => Some(Transport::H2 {
-            hosts: host.map(|h| h.split(',').map(str::to_string).collect()).unwrap_or_default(),
+            hosts: host
+                .map(|h| h.split(',').map(str::to_string).collect())
+                .unwrap_or_default(),
             path,
         }),
         "xhttp" | "splithttp" => Some(Transport::Xhttp {
@@ -233,7 +281,12 @@ fn transport_from(u: &Url, net: &str, d: &mut Diagnostics, name: &str) -> Option
         }),
         "quic" => Some(Transport::Quic),
         other => {
-            d.warn(Kind::FieldDropped, crate::diag::proxy_loc(name), Some("type"), format!("unknown transport `{other}`, treated as tcp"));
+            d.warn(
+                Kind::FieldDropped,
+                crate::diag::proxy_loc(name),
+                Some("type"),
+                format!("unknown transport `{other}`, treated as tcp"),
+            );
             None
         }
     }
@@ -243,15 +296,22 @@ fn parse_v2_style(u: &Url, vless: bool, d: &mut Diagnostics) -> Result<Proxy, St
     let port = u.port_u16()?;
     let name = u.name(port);
     let cred = dec(u.user.as_deref().ok_or("missing credentials")?);
-    let security = u.q(&["security"]).unwrap_or_else(|| if vless { "none".into() } else { "tls".into() });
+    let security = u
+        .q(&["security"])
+        .unwrap_or_else(|| if vless { "none".into() } else { "tls".into() });
     let mut tls = tls_from(u, security != "none");
     if security == "reality" {
         tls.reality = Some(Reality {
-            public_key: u.q(&["pbk", "public-key"]).ok_or("reality link without `pbk`")?,
+            public_key: u
+                .q(&["pbk", "public-key"])
+                .ok_or("reality link without `pbk`")?,
             short_id: u.q(&["sid", "short-id"]).unwrap_or_default(),
         });
     }
-    let net = u.q(&["type", "network"]).unwrap_or_default().to_ascii_lowercase();
+    let net = u
+        .q(&["type", "network"])
+        .unwrap_or_default()
+        .to_ascii_lowercase();
     let protocol = if vless {
         Protocol::Vless {
             uuid: cred,
@@ -277,8 +337,17 @@ fn parse_hy2(u: &Url) -> Result<Proxy, String> {
     let (port, mut hop): (u16, Vec<String>) = match first.parse::<u16>() {
         Ok(p) => (p, parts.map(str::to_string).collect()),
         Err(_) => {
-            let start = first.split('-').next().and_then(|p| p.parse().ok()).ok_or("invalid port")?;
-            (start, std::iter::once(first.to_string()).chain(parts.map(str::to_string)).collect())
+            let start = first
+                .split('-')
+                .next()
+                .and_then(|p| p.parse().ok())
+                .ok_or("invalid port")?;
+            (
+                start,
+                std::iter::once(first.to_string())
+                    .chain(parts.map(str::to_string))
+                    .collect(),
+            )
         }
     };
     if let Some(m) = u.q(&["mport", "ports"]) {
@@ -288,8 +357,14 @@ fn parse_hy2(u: &Url) -> Result<Proxy, String> {
     let password = u.user.as_deref().map(dec).unwrap_or_default();
     let protocol = Protocol::Hysteria2 {
         password,
-        ports: if hop.is_empty() { None } else { Some(hop.join(",")) },
-        hop_interval: u.q(&["hop-interval", "hopInterval"]).and_then(|v| v.trim_end_matches('s').parse().ok()),
+        ports: if hop.is_empty() {
+            None
+        } else {
+            Some(hop.join(","))
+        },
+        hop_interval: u
+            .q(&["hop-interval", "hopInterval"])
+            .and_then(|v| v.trim_end_matches('s').parse().ok()),
         obfs: u.q(&["obfs"]).filter(|o| o != "none"),
         obfs_password: u.q(&["obfs-password", "obfsPassword"]),
         up: u.q(&["up", "upmbps"]),
@@ -307,7 +382,9 @@ fn parse_hy1(u: &Url) -> Result<Proxy, String> {
         auth: u.q(&["auth", "auth_str"]),
         up: u.q(&["upmbps", "up"]),
         down: u.q(&["downmbps", "down"]),
-        obfs: u.q(&["obfsParam", "obfs-password"]).or_else(|| u.q(&["obfs"]).filter(|o| o != "xplus" && o != "none")),
+        obfs: u
+            .q(&["obfsParam", "obfs-password"])
+            .or_else(|| u.q(&["obfs"]).filter(|o| o != "xplus" && o != "none")),
         protocol: u.q(&["protocol"]),
         ports: u.q(&["mport"]),
         recv_window_conn: None,
@@ -360,8 +437,15 @@ fn parse_wg(u: &Url) -> Result<Proxy, String> {
     let port = u.port_u16()?;
     let name = u.name(port);
     let mut wg = WireGuard {
-        private_key: u.user.as_deref().map(dec).or_else(|| u.q(&["privatekey", "private-key"])).ok_or("missing private key")?,
-        public_key: u.q(&["publickey", "public-key", "peer"]).ok_or("missing public key")?,
+        private_key: u
+            .user
+            .as_deref()
+            .map(dec)
+            .or_else(|| u.q(&["privatekey", "private-key"]))
+            .ok_or("missing private key")?,
+        public_key: u
+            .q(&["publickey", "public-key", "peer"])
+            .ok_or("missing public key")?,
         pre_shared_key: u.q(&["presharedkey", "pre-shared-key", "psk"]),
         mtu: u.q(&["mtu"]).and_then(|m| m.parse().ok()),
         reserved: u.q(&["reserved"]).and_then(|r| {
@@ -396,7 +480,11 @@ fn parse_wg(u: &Url) -> Result<Proxy, String> {
 
 fn split_userpass(user: Option<&str>) -> (Option<String>, Option<String>) {
     let Some(raw) = user else { return (None, None) };
-    let decoded = if raw.contains(':') { dec(raw) } else { b64_str(raw).unwrap_or_else(|| dec(raw)) };
+    let decoded = if raw.contains(':') {
+        dec(raw)
+    } else {
+        b64_str(raw).unwrap_or_else(|| dec(raw))
+    };
     match decoded.split_once(':') {
         Some((a, b)) => (Some(a.to_string()), Some(b.to_string())),
         None => (Some(decoded), None),
@@ -406,7 +494,12 @@ fn split_userpass(user: Option<&str>) -> (Option<String>, Option<String>) {
 fn parse_socks(u: &Url) -> Result<Proxy, String> {
     let port = u.port_u16()?;
     let (user, password) = split_userpass(u.user.as_deref());
-    let mut p = proxy(u.name(port), u.host.clone(), port, Protocol::Socks5 { user, password });
+    let mut p = proxy(
+        u.name(port),
+        u.host.clone(),
+        port,
+        Protocol::Socks5 { user, password },
+    );
     if u.qb(&["tls"]) == Some(true) {
         p.tls = Some(tls_from(u, true));
     }
@@ -429,7 +522,16 @@ fn parse_http(u: &Url) -> Result<Proxy, String> {
         Err(e) => return Err(e),
     };
     let (user, password) = split_userpass(u.user.as_deref());
-    let mut p = proxy(u.name(port), u.host.clone(), port, Protocol::Http { user, password, headers: Vec::new() });
+    let mut p = proxy(
+        u.name(port),
+        u.host.clone(),
+        port,
+        Protocol::Http {
+            user,
+            password,
+            headers: Vec::new(),
+        },
+    );
     if u.scheme == "https" {
         p.tls = Some(tls_from(u, true));
     }
@@ -448,7 +550,11 @@ fn parse_ss(line: &str) -> Result<Proxy, String> {
             Some(i) => (&body[..i], &body[i..]),
             None => (body, ""),
         };
-        format!("ss://{}{}", b64_str(b64).ok_or("undecodable legacy ss link")?, tail)
+        format!(
+            "ss://{}{}",
+            b64_str(b64).ok_or("undecodable legacy ss link")?,
+            tail
+        )
     } else {
         format!("ss://{body}")
     };
@@ -460,9 +566,13 @@ fn parse_ss(line: &str) -> Result<Proxy, String> {
     } else {
         b64_str(&dec(user)).ok_or("undecodable ss credentials")?
     };
-    let (cipher, password) = userinfo.split_once(':').ok_or("ss credentials must be `method:password`")?;
+    let (cipher, password) = userinfo
+        .split_once(':')
+        .ok_or("ss credentials must be `method:password`")?;
     let plugin = u.q(&["plugin"]).map(|p| parse_sip003(&p));
-    let name = frag.filter(|f| !f.trim().is_empty()).unwrap_or_else(|| format!("ss {}:{port}", u.host));
+    let name = frag
+        .filter(|f| !f.trim().is_empty())
+        .unwrap_or_else(|| format!("ss {}:{port}", u.host));
     let mut p = proxy(
         name,
         u.host.clone(),
@@ -493,7 +603,9 @@ fn parse_sip003(s: &str) -> SsPlugin {
     let g = |k: &str| kv.iter().find(|(kk, _)| kk == k).map(|(_, v)| v.clone());
     match name.as_str() {
         "obfs-local" | "simple-obfs" | "obfs" => SsPlugin::Obfs {
-            mode: g("obfs").or_else(|| g("mode")).unwrap_or_else(|| "http".into()),
+            mode: g("obfs")
+                .or_else(|| g("mode"))
+                .unwrap_or_else(|| "http".into()),
             host: g("obfs-host").or_else(|| g("host")),
         },
         "v2ray-plugin" => SsPlugin::V2ray {
@@ -525,14 +637,21 @@ fn parse_ssr(line: &str) -> Result<Proxy, String> {
     if fields.len() < 6 {
         return Err("ssr link needs host:port:protocol:method:obfs:password".into());
     }
-    let (pass_b64, obfs, method, proto, port, host) = (fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]);
+    let (pass_b64, obfs, method, proto, port, host) = (
+        fields[0], fields[1], fields[2], fields[3], fields[4], fields[5],
+    );
     let port: u16 = port.parse().map_err(|_| "invalid port")?;
     let q: Vec<(&str, String)> = query
         .split('&')
         .filter_map(|kv| kv.split_once('='))
         .map(|(k, v)| (k, b64_str(v).unwrap_or_default()))
         .collect();
-    let g = |k: &str| q.iter().find(|(kk, _)| *kk == k).map(|(_, v)| v.clone()).filter(|v| !v.is_empty());
+    let g = |k: &str| {
+        q.iter()
+            .find(|(kk, _)| *kk == k)
+            .map(|(_, v)| v.clone())
+            .filter(|v| !v.is_empty())
+    };
     let name = g("remarks").unwrap_or_else(|| format!("ssr {host}:{port}"));
     Ok(proxy(
         name,
@@ -561,21 +680,32 @@ fn parse_vmess(line: &str) -> Result<Proxy, String> {
         Ok(j) => j,
         Err(_) => {
             // Shadowrocket style: base64(security:uuid@host:port)?params
-            let (cred, hp) = text.rsplit_once('@').ok_or("vmess link is neither JSON nor `security:uuid@host:port`")?;
+            let (cred, hp) = text
+                .rsplit_once('@')
+                .ok_or("vmess link is neither JSON nor `security:uuid@host:port`")?;
             let (sec, uuid) = cred.split_once(':').ok_or("bad vmess credentials")?;
             let u = Url::parse(&format!("vmess://{hp}?{query}")).ok_or("bad vmess address")?;
             let port = u.port_u16()?;
             let mut d = Diagnostics::default();
-            let name = frag.or_else(|| u.q(&["remarks", "remark"])).unwrap_or_else(|| format!("vmess {}:{port}", u.host));
+            let name = frag
+                .or_else(|| u.q(&["remarks", "remark"]))
+                .unwrap_or_else(|| format!("vmess {}:{port}", u.host));
             let net = u.q(&["obfs", "network", "type"]).unwrap_or_default();
-            let net = if net == "websocket" { "ws".to_string() } else { net };
+            let net = if net == "websocket" {
+                "ws".to_string()
+            } else {
+                net
+            };
             let mut p = proxy(
                 name.clone(),
                 u.host.clone(),
                 port,
                 Protocol::Vmess {
                     uuid: uuid.to_string(),
-                    alter_id: u.q(&["alterId", "aid"]).and_then(|a| a.parse().ok()).unwrap_or(0),
+                    alter_id: u
+                        .q(&["alterId", "aid"])
+                        .and_then(|a| a.parse().ok())
+                        .unwrap_or(0),
                     security: sec.to_string(),
                     global_padding: None,
                     authenticated_length: None,
@@ -598,9 +728,16 @@ fn parse_vmess(line: &str) -> Result<Proxy, String> {
         }
     };
     let host = g("add").ok_or("vmess link without `add`")?;
-    let port: u16 = g("port").and_then(|p| p.trim().parse().ok()).filter(|&p| p > 0).ok_or("vmess link with invalid `port`")?;
-    let name = g("ps").or(frag).unwrap_or_else(|| format!("vmess {host}:{port}"));
-    let net = g("net").unwrap_or_else(|| "tcp".into()).to_ascii_lowercase();
+    let port: u16 = g("port")
+        .and_then(|p| p.trim().parse().ok())
+        .filter(|&p| p > 0)
+        .ok_or("vmess link with invalid `port`")?;
+    let name = g("ps")
+        .or(frag)
+        .unwrap_or_else(|| format!("vmess {host}:{port}"));
+    let net = g("net")
+        .unwrap_or_else(|| "tcp".into())
+        .to_ascii_lowercase();
     let ty = g("type").unwrap_or_default();
     let hhost = g("host");
     let path = g("path");
@@ -624,13 +761,19 @@ fn parse_vmess(line: &str) -> Result<Proxy, String> {
             service_name: path.unwrap_or_default(),
         }),
         "h2" | "http" => Some(Transport::H2 {
-            hosts: hhost.map(|h| h.split(',').map(|s| s.trim().to_string()).collect()).unwrap_or_default(),
+            hosts: hhost
+                .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default(),
             path: path.unwrap_or_else(|| "/".into()),
         }),
         "tcp" if ty == "http" => Some(Transport::Http {
             method: None,
-            paths: path.map(|p| p.split(',').map(str::to_string).collect()).unwrap_or_else(|| vec!["/".into()]),
-            hosts: hhost.map(|h| h.split(',').map(|s| s.trim().to_string()).collect()).unwrap_or_default(),
+            paths: path
+                .map(|p| p.split(',').map(str::to_string).collect())
+                .unwrap_or_else(|| vec!["/".into()]),
+            hosts: hhost
+                .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default(),
             headers: Vec::new(),
         }),
         "xhttp" | "splithttp" => Some(Transport::Xhttp {
@@ -660,8 +803,12 @@ fn parse_vmess(line: &str) -> Result<Proxy, String> {
         p.tls = Some(Tls {
             enabled: true,
             sni: g("sni"),
-            insecure: g("allowInsecure").or_else(|| g("skip-cert-verify")).map(|v| v == "1" || v == "true"),
-            alpn: g("alpn").map(|a| a.split(',').map(str::to_string).collect()).unwrap_or_default(),
+            insecure: g("allowInsecure")
+                .or_else(|| g("skip-cert-verify"))
+                .map(|v| v == "1" || v == "true"),
+            alpn: g("alpn")
+                .map(|a| a.split(',').map(str::to_string).collect())
+                .unwrap_or_default(),
             utls: g("fp"),
             ..Default::default()
         });
@@ -681,17 +828,28 @@ mod tests {
     fn ss_variants() {
         let p = one("ss://YWVzLTI1Ni1nY206cGFzcw@1.2.3.4:8388#HK%2001");
         assert_eq!(p.name, "HK 01");
-        assert!(matches!(p.protocol, Protocol::Shadowsocks { ref cipher, ref password, .. } if cipher == "aes-256-gcm" && password == "pass"));
-        let p = one("ss://2022-blake3-aes-128-gcm:AAAA%3D%3D@h.example:443?plugin=obfs-local%3Bobfs%3Dtls%3Bobfs-host%3Dx.com#n");
-        assert!(matches!(p.protocol, Protocol::Shadowsocks { plugin: Some(SsPlugin::Obfs { ref mode, .. }), ref password, .. } if mode == "tls" && password == "AAAA=="));
-        let legacy = format!("ss://{}#x", base64::engine::general_purpose::STANDARD.encode("aes-128-gcm:pw@[::1]:443"));
+        assert!(
+            matches!(p.protocol, Protocol::Shadowsocks { ref cipher, ref password, .. } if cipher == "aes-256-gcm" && password == "pass")
+        );
+        let p = one(
+            "ss://2022-blake3-aes-128-gcm:AAAA%3D%3D@h.example:443?plugin=obfs-local%3Bobfs%3Dtls%3Bobfs-host%3Dx.com#n",
+        );
+        assert!(
+            matches!(p.protocol, Protocol::Shadowsocks { plugin: Some(SsPlugin::Obfs { ref mode, .. }), ref password, .. } if mode == "tls" && password == "AAAA==")
+        );
+        let legacy = format!(
+            "ss://{}#x",
+            base64::engine::general_purpose::STANDARD.encode("aes-128-gcm:pw@[::1]:443")
+        );
         let p = one(&legacy);
         assert_eq!(p.server, "::1");
     }
 
     #[test]
     fn vless_reality() {
-        let p = one("vless://uuid-1@1.2.3.4:443?security=reality&pbk=KEY&sid=01ab&sni=www.example.com&fp=chrome&flow=xtls-rprx-vision&type=tcp#R");
+        let p = one(
+            "vless://uuid-1@1.2.3.4:443?security=reality&pbk=KEY&sid=01ab&sni=www.example.com&fp=chrome&flow=xtls-rprx-vision&type=tcp#R",
+        );
         let t = p.tls.unwrap();
         assert_eq!(t.reality.unwrap().short_id, "01ab");
         assert_eq!(t.utls.as_deref(), Some("chrome"));
@@ -699,8 +857,12 @@ mod tests {
 
     #[test]
     fn hy2_port_hopping() {
-        let p = one("hysteria2://pw@h.example:443?mport=20000-30000&obfs=salamander&obfs-password=o#hy");
-        assert!(matches!(p.protocol, Protocol::Hysteria2 { ports: Some(ref s), .. } if s == "20000-30000"));
+        let p = one(
+            "hysteria2://pw@h.example:443?mport=20000-30000&obfs=salamander&obfs-password=o#hy",
+        );
+        assert!(
+            matches!(p.protocol, Protocol::Hysteria2 { ports: Some(ref s), .. } if s == "20000-30000")
+        );
         let p = one("hy2://pw@h.example:20000-30000/?sni=a#hy");
         assert_eq!(p.port, 20000);
     }
@@ -708,7 +870,10 @@ mod tests {
     #[test]
     fn vmess_json() {
         let j = r#"{"v":"2","ps":"V","add":"a.com","port":"443","id":"u","aid":0,"net":"ws","host":"h","path":"/p?ed=2048","tls":"tls"}"#;
-        let p = one(&format!("vmess://{}", base64::engine::general_purpose::STANDARD.encode(j)));
+        let p = one(&format!(
+            "vmess://{}",
+            base64::engine::general_purpose::STANDARD.encode(j)
+        ));
         assert_eq!(p.name, "V");
         assert!(matches!(p.transport, Some(Transport::Ws { .. })));
     }

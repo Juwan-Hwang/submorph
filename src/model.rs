@@ -235,7 +235,9 @@ pub enum Protocol {
         multiplexing: Option<String>,
     },
     /// A type the IR does not model; kept verbatim for same-format output.
-    Other { kind: String },
+    Other {
+        kind: String,
+    },
 }
 
 impl Protocol {

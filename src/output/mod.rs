@@ -70,7 +70,11 @@ pub const DEFAULT_GROUP: &str = "PROXY";
 
 /// The groups and rules to render. A bare node list gets one selector with
 /// every node and a final rule, so the output is usable on its own.
-pub fn default_groups(cfg: &Config, opts: &ConvertOptions, d: &mut Diagnostics) -> (Vec<Group>, Vec<Rule>) {
+pub fn default_groups(
+    cfg: &Config,
+    opts: &ConvertOptions,
+    d: &mut Diagnostics,
+) -> (Vec<Group>, Vec<Rule>) {
     if !cfg.groups.is_empty() || !cfg.rules.is_empty() || !opts.add_defaults {
         return (cfg.groups.clone(), cfg.rules.clone());
     }

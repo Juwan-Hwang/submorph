@@ -51,11 +51,10 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
         limits,
         warnings: Vec::new(),
     };
-    let mut parser = Parser::new_from_str(src);
+    let parser = Parser::new_from_str(src);
     let mut stack: Vec<Frame> = Vec::new();
     let mut root: Option<Value> = None;
-    loop {
-        let Some(ev) = parser.next() else { break };
+    for ev in parser {
         let (ev, span) = ev.map_err(|e| YamlError {
             line: Some(e.marker().line()),
             message: e.info().to_string(),
@@ -124,10 +123,20 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
             }
             Event::SequenceEnd => match stack.pop() {
                 Some(Frame::Seq(a, items)) => Some((Value::Seq(items), a)),
-                _ => return Err(YamlError { line: Some(line), message: "unbalanced sequence".into() }),
+                _ => {
+                    return Err(YamlError {
+                        line: Some(line),
+                        message: "unbalanced sequence".into(),
+                    });
+                }
             },
             Event::MappingEnd => match stack.pop() {
-                Some(Frame::Map { anchor, mut entries, merges, .. }) => {
+                Some(Frame::Map {
+                    anchor,
+                    mut entries,
+                    merges,
+                    ..
+                }) => {
                     // Explicit keys win over merged ones, regardless of order.
                     for m in merges {
                         for (k, v) in m {
@@ -138,7 +147,12 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
                     }
                     Some((Value::Map(entries), anchor))
                 }
-                _ => return Err(YamlError { line: Some(line), message: "unbalanced mapping".into() }),
+                _ => {
+                    return Err(YamlError {
+                        line: Some(line),
+                        message: "unbalanced mapping".into(),
+                    });
+                }
             },
         };
         if let Some((v, anchor)) = done {
@@ -152,7 +166,12 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
                     }
                 }
                 Some(Frame::Seq(_, items)) => items.push(v),
-                Some(Frame::Map { entries, merges, key, .. }) => match key.take() {
+                Some(Frame::Map {
+                    entries,
+                    merges,
+                    key,
+                    ..
+                }) => match key.take() {
                     None => {
                         let k = match &v {
                             Value::Scalar { text, .. } => KeyState::Key(text.clone()),
@@ -162,7 +181,9 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
                         *key = Some(k);
                     }
                     Some(KeyState::Complex) => {
-                        b.warnings.push(format!("line {line}: ignored a mapping entry with a non-scalar key"));
+                        b.warnings.push(format!(
+                            "line {line}: ignored a mapping entry with a non-scalar key"
+                        ));
                     }
                     Some(KeyState::Key(k)) => {
                         if k == "<<" {
@@ -175,10 +196,14 @@ pub fn parse(src: &str, limits: Limits) -> Result<(Value, Vec<String>), YamlErro
                                         }
                                     }
                                 }
-                                _ => b.warnings.push(format!("line {line}: ignored a `<<` merge of a non-mapping")),
+                                _ => b.warnings.push(format!(
+                                    "line {line}: ignored a `<<` merge of a non-mapping"
+                                )),
                             }
                         } else if let Some(slot) = entries.iter_mut().find(|(ek, _)| *ek == k) {
-                            b.warnings.push(format!("line {line}: duplicate key `{k}`, the last value is used"));
+                            b.warnings.push(format!(
+                                "line {line}: duplicate key `{k}`, the last value is used"
+                            ));
                             slot.1 = v;
                         } else {
                             entries.push((k, v));
@@ -304,7 +329,12 @@ fn emit_child(out: &mut String, v: &Value, ind: usize) {
             out.push('\n');
             emit_map(out, m, ind + 2);
         }
-        Value::Seq(s) if !s.is_empty() && !s.iter().all(|x| matches!(x, Value::Scalar { .. } | Value::Null)) => {
+        Value::Seq(s)
+            if !s.is_empty()
+                && !s
+                    .iter()
+                    .all(|x| matches!(x, Value::Scalar { .. } | Value::Null)) =>
+        {
             out.push('\n');
             emit_seq(out, s, ind + 2);
         }
@@ -331,7 +361,10 @@ fn is_flat(v: &Value) -> bool {
 fn emit_inline(out: &mut String, v: &Value) {
     match v {
         Value::Null => out.push_str("null"),
-        Value::Scalar { text, quoted: false } => {
+        Value::Scalar {
+            text,
+            quoted: false,
+        } => {
             if plain_syntax_ok(text, true) {
                 out.push_str(text)
             } else {
@@ -382,7 +415,9 @@ fn emit_str_flow(out: &mut String, s: &str) {
 
 /// Whether `s` can be written as a plain scalar without changing its text.
 fn plain_syntax_ok(s: &str, flow: bool) -> bool {
-    let Some(first) = s.chars().next() else { return false };
+    let Some(first) = s.chars().next() else {
+        return false;
+    };
     if s.starts_with(' ') || s.ends_with(' ') || s.ends_with(':') {
         return false;
     }
@@ -392,7 +427,9 @@ fn plain_syntax_ok(s: &str, flow: bool) -> bool {
     if s.contains(": ") || s.contains(" #") || s.contains('\t') {
         return false;
     }
-    if s.chars().any(|c| c.is_control() || c == '\u{feff}' || c == '\u{a0}' || c == '\u{2028}' || c == '\u{2029}') {
+    if s.chars().any(|c| {
+        c.is_control() || c == '\u{feff}' || c == '\u{a0}' || c == '\u{2028}' || c == '\u{2029}'
+    }) {
         return false;
     }
     if flow && s.contains([',', '[', ']', '{', '}', '?']) {
@@ -406,7 +443,20 @@ fn resolves_as_string(s: &str) -> bool {
     let l = s.to_ascii_lowercase();
     if matches!(
         l.as_str(),
-        "null" | "~" | "true" | "false" | "yes" | "no" | "on" | "off" | "y" | "n" | ".inf" | "-.inf" | "+.inf" | ".nan"
+        "null"
+            | "~"
+            | "true"
+            | "false"
+            | "yes"
+            | "no"
+            | "on"
+            | "off"
+            | "y"
+            | "n"
+            | ".inf"
+            | "-.inf"
+            | "+.inf"
+            | ".nan"
     ) {
         return false;
     }
@@ -415,7 +465,10 @@ fn resolves_as_string(s: &str) -> bool {
     }
     // YAML 1.1 octal / sexagesimal / leading-zero numbers and timestamps
     let b = s.strip_prefix(['-', '+']).unwrap_or(s);
-    if !b.is_empty() && b.bytes().all(|c| c.is_ascii_digit() || c == b':' || c == b'.' || c == b'_' || c == b'-') {
+    if !b.is_empty()
+        && b.bytes()
+            .all(|c| c.is_ascii_digit() || c == b':' || c == b'.' || c == b'_' || c == b'-')
+    {
         return false;
     }
     true

@@ -85,7 +85,14 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
-    pub fn push(&mut self, severity: Severity, kind: Kind, location: impl Into<String>, field: Option<&str>, message: impl Into<String>) {
+    pub fn push(
+        &mut self,
+        severity: Severity,
+        kind: Kind,
+        location: impl Into<String>,
+        field: Option<&str>,
+        message: impl Into<String>,
+    ) {
         self.items.push(Diagnostic {
             severity,
             kind,
@@ -94,13 +101,31 @@ impl Diagnostics {
             message: message.into(),
         });
     }
-    pub fn info(&mut self, kind: Kind, loc: impl Into<String>, field: Option<&str>, msg: impl Into<String>) {
+    pub fn info(
+        &mut self,
+        kind: Kind,
+        loc: impl Into<String>,
+        field: Option<&str>,
+        msg: impl Into<String>,
+    ) {
         self.push(Severity::Info, kind, loc, field, msg)
     }
-    pub fn warn(&mut self, kind: Kind, loc: impl Into<String>, field: Option<&str>, msg: impl Into<String>) {
+    pub fn warn(
+        &mut self,
+        kind: Kind,
+        loc: impl Into<String>,
+        field: Option<&str>,
+        msg: impl Into<String>,
+    ) {
         self.push(Severity::Warning, kind, loc, field, msg)
     }
-    pub fn error(&mut self, kind: Kind, loc: impl Into<String>, field: Option<&str>, msg: impl Into<String>) {
+    pub fn error(
+        &mut self,
+        kind: Kind,
+        loc: impl Into<String>,
+        field: Option<&str>,
+        msg: impl Into<String>,
+    ) {
         self.push(Severity::Error, kind, loc, field, msg)
     }
     pub fn extend(&mut self, other: Diagnostics) {
